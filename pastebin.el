@@ -48,7 +48,7 @@
   :group 'pastebin
   )
 
-(defcustom pastebin-domain-versions '(("pastebin.com" "/api_public.php")
+(defcustom pastebin-domain-versions '(("pastebin.com" "/api/api_post.php")
                                       ("pastebin.example.com" "/pastebin.php"))
   "The version of pastebin that is supported by domains that you use.
 
@@ -190,16 +190,18 @@ different domain.
       (setq domain pastebin-default-domain))
   (let* ((path (cadr (assoc domain pastebin-domain-versions)))
          (params (cond
-                  ((equal path "/api_public.php")
+                  ((equal path "/api/api_post.php")
                    (concat "submit=submit"
-                           "&paste_private=0"
+                           "&api_paste_private=0"
                            "&paste_expire_date=N"
                            (if (not (equal domain "pastebin.com")) 
                                "&paste_subdomain=%s"
                              "paste_placeholder=%s")
-                           "&paste_format=%s"
-                           "&paste_name=%s"
-                           "&paste_code=%s"))
+                           "&api_paste_format=%s"
+                           "&api_paste_name=%s"
+                           "&api_paste_code=%s"
+			   "&api_option=paste"
+			   "&api_dev_key=GET_YOUR_OWN_API_KEY"))
                   ((equal path "/pastebin.php")
                    (concat "paste=Send"
                            "&private=0"
