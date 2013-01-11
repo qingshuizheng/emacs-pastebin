@@ -248,5 +248,46 @@ different domain.
                            (clipboard-kill-ring-save (point) (point-max))
                            (message "Pastebin URL: %s" (buffer-substring (point) (point-max)))))))))))
 
+(defun pastebin-fetch-pastes-list (&optional limit)
+  (let* ((params (concat "api_dev_key=" pastebin-unique-developer-api-key
+                         "&api_user_key=" pastebin-user-api-key
+                         "&api_results_limits=100"
+                         "&api_option=" "list"))
+         (url-request-method "POST")
+         (url-request-extra-headers
+          '(("Content-Type" . "application/x-www-form-urlencoded")))
+         (url-request-data
+          params)
+         (content-buf (url-retrieve
+                       pastebin-post-request-paste-url
+                       (lambda (arg)
+                         (cond
+                          ((equal :error (car arg))
+                           (signal 'pastebin-error (cdr arg)))
+                          (t
+                           (re-search-forward "\n\n")
+                           (kill-region (point-min) (point))
+                           (goto-char (point-min))
+                           (while (re-search-forward "\r\n" nil t)
+                             (replace-match ""))
+                           (goto-char (point-min))
+                           (insert "<root>")
+                           (goto-char (point-max))
+                           (insert "</root>")
+                           (setq pastebin-pastes-list (xml-parse-region (point-min) (point-max)))))))))))
+
+(defmacro pastebin-pastes ()
+  `(nthcdr 2 (car pastebin-pastes-list)))
+
+(defmacro pastebin-pastes-foreach-paste (&rest body)
+  `(dolist (paste (pastebin-pastes))
+     ,@body))
+
+(defun pastebin-pastes-nth (nth)
+  (elt (pastebin-pastes) nth))
+
+(defun pastebin-paste-get-attr (paste attr)
+  (car (last (assoc attr paste))))
+
 (provide 'pastebin)
 ;;; pastebin.el ends here
