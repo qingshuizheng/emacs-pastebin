@@ -2,6 +2,8 @@
 
 ;;; Copyright (C) 2008 by Nic Ferrier <nic@ferrier.me.uk>
 ;;; Copyright (C) 2010 by Ivan Korotkov <twee@tweedle-dee.org>
+;;; Copyright (C) 2012 by Filonenko Michael <filonenko.mikhail@gmail.com>
+;;; Copyright (C) 2012 by Daniel Hilst <danielhilst@gmail.com>
 
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -20,15 +22,26 @@
 
 ;;; Commentary:
 ;;;
-;;; Load this file and run:
+;;; Make pastebin account:
 ;;;
-;;;   M-x pastebin-buffer
+;;;   http://pastebin.com/signup
+;;; 
+;;; Get Unique developer key:
 ;;;
-;;; to send the whole buffer or select a region and run
+;;;   http://pastebin.com/api  
+;;;
+;;; Setup emacs:
+;;;
+;;;   (require 'pastebin)
+;;;   (setq pastebin-unique-developer-api-key "HEX") ;; from http://pastebin.com/api
+;;;   (setq pastebin-user-name "username")
+;;;   (setq pastebin-password "password")
+;;;
+;;;   (pastebin-login)
+;;;
+;;; To send the whole buffer or select region and run
 ;;;
 ;;;  M-x pastebin
-;;;
-;;; to send just the region.
 ;;;
 ;;; In either case the url that pastebin generates is left on the kill
 ;;; ring and the paste buffer.
@@ -36,32 +49,61 @@
 
 ;;; Code:
 
-;;;###autoload
 (defgroup pastebin nil
   "Pastebin -- pastebin.com client"
   :tag "Pastebin"
   :group 'tools)
 
-(defcustom pastebin-default-domain "pastebin.com"
-  "Pastebin domain to use by default"
+(defcustom pastebin-unique-developer-api-key "INSERT_YOURS"
+  "Everybody using our API is required to use a valid Developer
+ API Key. You automaticly get a key when you become a member of
+ Pastebin. http://pastebin.com/api"
   :type 'string
-  :group 'pastebin
-  )
+  :group 'pastebin)
 
-(defcustom pastebin-domain-versions '(("pastebin.com" "/api/api_post.php")
-                                      ("pastebin.example.com" "/pastebin.php"))
-  "The version of pastebin that is supported by domains that you use.
+(defcustom pastebin-user-name "guest"
+  "Username of the user you want to login."
+  :type 'string
+  :group 'pastebin)
 
-As Pastebin changes versions they sometimes change the path used. 
-Valid paths are:
+(defcustom pastebin-password "guest"
+  "Password of the user you want to login."
+  :type 'string
+  :group 'pastebin)
 
- /pastebin.php   - early version
- /api_public.php - current version
+(defcustom pastebin-post-request-login-url "http://pastebin.com/api/api_login.php"
+  "Login url"
+  :type 'string
+  :group 'pastebin)
 
-The pastebin code adapts to the version depending on this.
-"
-  :group 'pastebin
-  )
+(defcustom pastebin-post-request-paste-url "http://pastebin.com/api/api_post.php"
+  "Paste url"
+  :type 'string
+  :group 'pastebin)
+
+(defcustom pastebin-user-api-key "INSERT_YOURS"
+  "Key for pastebin members"
+  :type 'string
+  :group 'pastebin)
+
+(defun pastebin-login ()
+  (let* ((params (concat "api_dev_key=" pastebin-unique-developer-api-key
+                         "&api_user_name=" (url-hexify-string pastebin-user-name)
+                         "&api_user_password=" (url-hexify-string pastebin-password)))
+         (url-request-method "POST")
+         (url-request-extra-headers
+          '(("Content-Type" . "application/x-www-form-urlencoded")))
+         (url-request-data params)
+         (content-buf (url-retrieve
+                       pastebin-post-request-login-url
+                       (lambda (arg)
+                         (cond
+                          ((equal :error (car arg))
+                           (signal 'pastebin-error (cdr arg)))
+                          (t
+                           (re-search-forward "\n\n")
+                           (setq pastebin-user-api-key (buffer-substring (point) (point-max)))))))))))
+
 
 (defcustom pastebin-type-assoc
   '((actionscript-mode . " actionscript")
@@ -138,30 +180,26 @@ The pastebin code adapts to the version depending on this.
     (tcl-mode . "tcl")
     (visual-basic-mode . "vb")
     (xml-mode . "xml")
-    (yaml-mode . "properties"))
+    (yaml-mode . "properties")
+    (text-mode . "text"))
   "Alist composed of major-mode names and corresponding pastebin highlight formats."
   :type '(alist :key-type symbol :value-tupe string)
   :group 'pastebin)
 
+(defcustom pastebin-type-assoc
+  '((never . "N") ;;    N = Never
+    (ten-minutes . "10M")             ;; 10M = 10 Minutes
+    (one-hour . "1H")  ;; 1H = 1 Hour
+    (one-day . "1D")     ;; 1D = 1 Day
+    (one-month . "1M"))     ;; 1M = 1 Month 
+    "We have 5 valid values available which you can use with the 'api_paste_expire_date' parameter."
+    :type '(alist :key-type symbol :value-tupe string)
+    :group 'pastebin)
+
 (defvar pastebin-domain-history '())
 
-;;;###autoload
-(defun pastebin-buffer (&optional domain)
-  "Send the whole buffer to pastebin.com.
-Optional argument domain will request the virtual host to use,
-eg:'emacs.pastebin.com' or 'mylocalpastebin.com'."
-  (interactive
-   (let ((pastebin-domain
-          (if current-prefix-arg
-              (read-string "pastebin domain:" 
-                           pastebin-default-domain
-                           'pastebin-domain-history) pastebin-default-domain)))
-     (list pastebin-domain)))
-  (pastebin (point-min) (point-max) domain))
-
-;;;###autoload
-(defun pastebin (start end &optional domain)
-  "Send the region to the pastebin service specified by domain.
+(defun pastebin (start end &optional name)
+  "Send the region to the pastebin service specified.
 
 See pastebin.com for more information about pastebin.
 
@@ -176,58 +214,31 @@ If domain is used pastebin prompts for a domain defaulting to
 'pastebin-default-domain' so you can send requests or use a
 different domain.
 "
-  (interactive
-   (let ((pastebin-domain
-          (if current-prefix-arg
-              (read-string "pastebin domain:" 
-                           pastebin-default-domain
-                           'pastebin-domain-history) pastebin-default-domain)))
-     (if (mark)
-         (list (region-beginning) (region-end) pastebin-domain)
-       (list (point-min) (point-max) pastebin-domain))))
+  (interactive 
+   (if (region-active-p)
+       (list (region-beginning) (region-end) nil)
+     (list (point-min) (point-max) nil)))
   ;; Main function
-  (if (not domain)
-      (setq domain pastebin-default-domain))
-  (let* ((path (cadr (assoc domain pastebin-domain-versions)))
-         (params (cond
-                  ((equal path "/api/api_post.php")
-                   (concat "submit=submit"
-                           "&api_paste_private=0"
-                           "&paste_expire_date=N"
-                           (if (not (equal domain "pastebin.com")) 
-                               "&paste_subdomain=%s"
-                             "paste_placeholder=%s")
-                           "&api_paste_format=%s"
-                           "&api_paste_name=%s"
-                           "&api_paste_code=%s"
-			   "&api_option=paste"
-			   "&api_dev_key=GET_YOUR_OWN_API_KEY"))
-                  ((equal path "/pastebin.php")
-                   (concat "paste=Send"
-                           "&private=0"
-                           "&expiry=N"
-                           "&subdomain=%s"
-                           "&format=%s"
-                           "&poster=%s"
-                           "&code2=%s"))
-                  ('t
-                   (signal 
-                    'pastebin-version-error 
-                    "pastebin.el doesn't support that version of pastebin"))))
-         (data (buffer-substring-no-properties start end))
-         (pastebin-url (format "http://%s%s" domain path))
+  (print (buffer-substring-no-properties start end))
+  (let* ((data (buffer-substring-no-properties start end))
+         (params (concat "api_dev_key=" pastebin-unique-developer-api-key
+                         "&api_user_key=" pastebin-user-api-key
+                         "&api_option=" "paste"
+                         "&api_paste_code=" (url-hexify-string data)
+                         "&api_paste_format=" (or
+                                               (assoc-default major-mode pastebin-type-assoc nil "text")
+                                               "text")
+                         (if name
+                             (concat "&api_paste_name=" (url-hexify-string name))
+                           (concat "&api_paste_name=" (url-hexify-string (buffer-name))))
+                         ))
          (url-request-method "POST")
          (url-request-extra-headers
           '(("Content-Type" . "application/x-www-form-urlencoded")))
          (url-request-data
-          (concat (format 
-                   params 
-                   domain
-                   (or (assoc-default major-mode pastebin-type-assoc) "text")
-                   (url-hexify-string (user-full-name))
-                   (url-hexify-string data))))
+          params)
          (content-buf (url-retrieve 
-                       pastebin-url
+                       pastebin-post-request-paste-url
                        (lambda (arg)
                          (cond
                           ((equal :error (car arg))
