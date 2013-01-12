@@ -198,7 +198,7 @@
 
 (defvar pastebin-domain-history '())
 
-(defun pastebin (start end &optional name)
+(defun pastebin (start end &optional name user-params)
   "Send the region to the pastebin service specified.
 
 See pastebin.com for more information about pastebin.
@@ -219,7 +219,6 @@ different domain.
        (list (region-beginning) (region-end) nil)
      (list (point-min) (point-max) nil)))
   ;; Main function
-  (print (buffer-substring-no-properties start end))
   (let* ((data (buffer-substring-no-properties start end))
          (params (concat "api_dev_key=" pastebin-unique-developer-api-key
                          "&api_user_key=" pastebin-user-api-key
@@ -231,6 +230,9 @@ different domain.
                          (if name
                              (concat "&api_paste_name=" (url-hexify-string name))
                            (concat "&api_paste_name=" (url-hexify-string (buffer-name))))
+                         
+                         (when user-params
+                           (concat "&" (url-hexify-string user-params)))
                          ))
          (url-request-method "POST")
          (url-request-extra-headers
@@ -248,7 +250,7 @@ different domain.
                            (clipboard-kill-ring-save (point) (point-max))
                            (message "Pastebin URL: %s" (buffer-substring (point) (point-max)))))))))))
 
-(defun pastebin-fetch-pastes-list (&optional limit)
+(defun pastebin-pastes-list-fetch (&optional limit)
   (let* ((params (concat "api_dev_key=" pastebin-unique-developer-api-key
                          "&api_user_key=" pastebin-user-api-key
                          "&api_results_limits=100"
@@ -283,11 +285,66 @@ different domain.
   `(dolist (paste (pastebin-pastes))
      ,@body))
 
+(defun pastebin-pastes-find-by-title (paste-title)
+  (catch 'paste-found
+    (dolist (paste (pastebin-pastes))
+      (when (string= paste-title (pastebin-paste-get-attr paste 'paste_title))
+        (message "found")
+        (throw 'paste-found paste)))))
+
+(defun pastebin-pastes-list-expired? ()
+  t)
+
+(defvar pastebin-pastes-list nil)
+
+;; FIXME: When I ran this, I loose the paste key
+;; I need to keep paste's keys between replaces
+(defun pastebin-replace (b e &optional name)
+  (interactive
+   (if (region-active-p)
+       (list (region-beginning) (region-end) nil)
+     (list (point-min) (point-max) nil)))
+
+  ;; Update list
+  (when (pastebin-pastes-list-expired?)
+      (pastebin-pastes-list-fetch))
+
+  (while (not pastebin-pastes-list)
+    (sleep-for 0.2))
+
+  (let* ((paste-name (buffer-name))
+        (paste-found (pastebin-pastes-find-by-title paste-name))
+        (paste-key (when paste-found
+                     (pastebin-paste-delete paste-found)
+                     (concat "api_paste_key=" (pastebin-paste-get-attr paste-found 'paste_key)))))
+    (pastebin b e nil paste-key))
+  )
+
+
 (defun pastebin-pastes-nth (nth)
   (elt (pastebin-pastes) nth))
 
 (defun pastebin-paste-get-attr (paste attr)
   (car (last (assoc attr paste))))
 
+(defun pastebin-paste-delete (paste)
+  (let* ((params (concat "api_dev_key=" pastebin-unique-developer-api-key
+                         "&api_user_key=" pastebin-user-api-key
+                         "&api_paste_key=" (pastebin-paste-get-attr paste 'paste_key)
+                         "&api_option=delete"))
+         (url-request-method "POST")
+         (url-request-extra-headers
+          '(("Content-Type" . "application/x-www-form-urlencoded")))
+         (url-request-data params)
+         (content-buf (url-retrieve
+                       pastebin-post-request-paste-url
+                       (lambda (arg &rest paste)
+                         (cond
+                          ((equal :error (car arg))
+                           (signal 'pastebin-error (cdr arg)))
+                          (t
+                           (message (format "Paste %s deleted" (pastebin-paste-get-attr paste 'paste_title)))))) 
+                       paste)))))
+
 (provide 'pastebin)
-;;; pastebin.el ends here
+;;; pastebin.el ends herex
