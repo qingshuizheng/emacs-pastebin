@@ -251,6 +251,7 @@ different domain.
                            (message "Pastebin URL: %s" (buffer-substring (point) (point-max)))))))))))
 
 (defun pastebin-pastes-list-fetch (&optional limit)
+  (setq pastebin-pastes-list nil)
   (let* ((params (concat "api_dev_key=" pastebin-unique-developer-api-key
                          "&api_user_key=" pastebin-user-api-key
                          "&api_results_limits=100"
@@ -299,6 +300,13 @@ different domain.
 
 ;; FIXME: When I ran this, I loose the paste key
 ;; I need to keep paste's keys between replaces
+;; >> I can't keep keys since Pastebin API don't 
+;; support this.
+;;
+;; FIXME: Sometimes Pastebin anti-spam is triggered.
+;; I need to refetch pastes list to see if my paste was
+;; really replaced, if not I need to alert user to open
+;; url retrieved from Pastebin and feed the captcha
 (defun pastebin-replace (b e &optional name)
   (interactive
    (if (region-active-p)
@@ -348,6 +356,7 @@ different domain.
 
 ;; FIXME: Set modes acordily to pastebin-type-assoc and update pastebin-pastes-list
 ;; Also handle the (buffer already in use) problem 
+;; And handle the danm ^M characters
 (defun pastebin-paste-fetch (paste)
   (let* ((paste-url (concat "http://pastebin.com/raw.php?i=" (pastebin-paste-get-attr paste 'paste_key)))
          (url-request-method "POST")
@@ -365,6 +374,37 @@ different domain.
                            (rename-buffer (pastebin-paste-get-attr paste 'paste_title))
                            (switch-to-buffer-other-window (current-buffer)))))
                        paste)))))
+
+;; FIXME: Improve the output here. Also I want to
+;; support deletion list from here. Untitled pastes
+;; should be highlighted! Maybe I can retitle the paste
+;; from here?
+(defun pastebin-list-buffer ()
+  (interactive)
+  (and (pastebin-pastes-list-expired?)
+       (pastebin-pastes-list-fetch))
+
+  (while (not pastebin-pastes-list)
+    (sleep-for 0.2))
+
+  (with-current-buffer (get-buffer-create "*Pastebin List*")
+    (let ((inhibit-read-only t))
+      (erase-buffer))
+
+    (widget-minor-mode 1)
+
+    (dolist (paste (pastebin-pastes))
+      (widget-create 'link 
+                     :notify (lambda (wid &rest ignore)
+                               (pastebin-paste-fetch (widget-get wid :paste)))
+                     :paste paste
+                     :follow-link t
+                     :value (or 
+                             (pastebin-paste-get-attr paste 'paste_title) 
+                             (pastebin-paste-get-attr paste 'paste_key)))
+      (widget-insert "\n"))
+    (widget-setup)
+    (switch-to-buffer-other-window (current-buffer))))
 
 (provide 'pastebin)
 ;;; pastebin.el ends herex
