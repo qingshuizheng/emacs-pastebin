@@ -375,10 +375,8 @@ different domain.
                            (switch-to-buffer-other-window (current-buffer)))))
                        paste)))))
 
-;; FIXME: Improve the output here. Also I want to
-;; support deletion list from here. Untitled pastes
-;; should be highlighted! Maybe I can retitle the paste
-;; from here?
+;; FIXME: I want to support deletion list from here. Untitled pastes
+;; should be highlighted! Maybe I can retitle the paste from here?
 (defun pastebin-list-buffer ()
   (interactive)
   (and (pastebin-pastes-list-expired?)
@@ -393,18 +391,33 @@ different domain.
 
     (widget-minor-mode 1)
 
+    (widget-insert (format "%5.5s | %-8.8s | %-32.32s | %-7.7s | %-15.15s\n"
+                           "VIEW" "ID" "NAME" "SYNTAX" "DATE"))
     (dolist (paste (pastebin-pastes))
       (widget-create 'link 
                      :notify (lambda (wid &rest ignore)
                                (pastebin-paste-fetch (widget-get wid :paste)))
                      :paste paste
                      :follow-link t
-                     :value (or 
-                             (pastebin-paste-get-attr paste 'paste_title) 
-                             (pastebin-paste-get-attr paste 'paste_key)))
-      (widget-insert "\n"))
+                     :value (format "%4.4s | %-8.8s | %-32.32s | %-7.7s | %-15.15s"
+                                    (if (string= (pastebin-paste-get-attr paste 'paste_private) "1")
+                                        "PRIV"
+                                      "PUBL")
+                                    (pastebin-paste-get-attr paste 'paste_key)
+                                    (or (pastebin-paste-get-attr paste 'paste_title) "")
+                                    (pastebin-paste-get-attr paste 'paste_format_short)
+                                    (format-time-string "%c" (seconds-to-time (string-to-number (pastebin-paste-get-attr paste 'paste_date))))
+                                    )
+                     )
+
+      (widget-insert "\n")
+      )
     (widget-setup)
-    (switch-to-buffer-other-window (current-buffer))))
+    (goto-char (point-min))
+    (switch-to-buffer-other-window (current-buffer))
+    )
+  )
+
 
 (provide 'pastebin)
 ;;; pastebin.el ends herex
