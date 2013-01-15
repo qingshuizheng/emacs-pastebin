@@ -429,14 +429,14 @@ different domain.
     (use-local-map pastebin-map)
 
     (widget-insert (format "%5.5s | %-8.8s | %-32.32s | %-7.7s | %-15.15s\n"
-                           "VIEW" "ID" "NAME" "SYNTAX" "DATE"))
+                           "VIEW" "ID" "TITLE" "SYNTAX" "DATE"))
     (dolist (paste (pastebin-pastes))
       (widget-create 'link 
                      :notify (lambda (wid &rest ignore)
                                (pastebin-paste-fetch (widget-get wid :paste)))
                      :paste paste
                      :follow-link t
-                     :value (format "%4.4s | %-8.8s | %-32.32s | %-7.7s | %-15.15s"
+                     :value (format "%4.4s | %-8.8s | %-32.32s | %-7.7s | %-20.20s"
                                     (if (string= (pastebin-paste-get-attr paste 'paste_private) "1")
                                         "PRIV"
                                       "PUBL")
