@@ -13,4 +13,4 @@
 2. Replace pastes with pastebin-replace (creates a new if none exist)
 3. Get a buffer with a list of pastes and open one by pressing pointing to it and pressing RET
 4. Delete pastes
-5. Trigger a minor mode on buffer resulting of step 2
+5. Trigger a new map for item 3

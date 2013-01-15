@@ -81,10 +81,20 @@
   :type 'string
   :group 'pastebin)
 
-(defcustom pastebin-user-api-key "INSERT_YOURS"
-  "Key for pastebin members"
-  :type 'string
-  :group 'pastebin)
+(defun pastebin-delete-paste-at-point ()
+  (interactive)
+  (let ((wid (widget-at)))
+    (if (not wid)
+        (error "No paste at point")
+      (let ((oldpoint (point)))
+        (pastebin-paste-delete (widget-get wid :paste))
+        (pastebin-pastes-list-fetch)
+        (pastebin-list-buffer)
+        (goto-char oldpoint)
+        )
+      )
+    )
+  )
 
 (defun pastebin-login ()
   (let* ((params (concat "api_dev_key=" pastebin-unique-developer-api-key
@@ -197,6 +207,12 @@
     :group 'pastebin)
 
 (defvar pastebin-domain-history '())
+
+(defvar pastebin-map
+  (let ((pastebin-map (make-sparse-keymap)))
+    (define-key pastebin-map (kbd "d") 'pastebin-delete-paste-at-point)
+    pastebin-map)
+  "Key map for pastebin list buffer")
 
 (defun pastebin (start end &optional name user-params)
   "Send the region to the pastebin service specified.
@@ -328,7 +344,6 @@ different domain.
     (pastebin b e nil paste-key))
   )
 
-
 (defun pastebin-pastes-nth (nth)
   (elt (pastebin-pastes) nth))
 
@@ -390,6 +405,7 @@ different domain.
       (erase-buffer))
 
     (widget-minor-mode 1)
+    (use-local-map pastebin-map)
 
     (widget-insert (format "%5.5s | %-8.8s | %-32.32s | %-7.7s | %-15.15s\n"
                            "VIEW" "ID" "NAME" "SYNTAX" "DATE"))
@@ -414,7 +430,7 @@ different domain.
       )
     (widget-setup)
     (goto-char (point-min))
-    (switch-to-buffer-other-window (current-buffer))
+    (switch-to-buffer (current-buffer))
     )
   )
 
