@@ -346,5 +346,25 @@ different domain.
                            (message (format "Paste %s deleted" (pastebin-paste-get-attr paste 'paste_title)))))) 
                        paste)))))
 
+;; FIXME: Set modes acordily to pastebin-type-assoc and update pastebin-pastes-list
+;; Also handle the (buffer already in use) problem 
+(defun pastebin-paste-fetch (paste)
+  (let* ((paste-url (concat "http://pastebin.com/raw.php?i=" (pastebin-paste-get-attr paste 'paste_key)))
+         (url-request-method "POST")
+         (url-request-extra-headers
+          '(("Content-Type" . "application/x-www-form-urlencoded")))
+         (content-buf (url-retrieve 
+                       paste-url
+                       (lambda (arg &rest paste)
+                         (cond
+                          ((equal :error (car arg))
+                           (signal 'pastebin-error (cdr arg)))
+                          (t
+                           (re-search-forward "\n\n")
+                           (kill-region (point-min) (point))
+                           (rename-buffer (pastebin-paste-get-attr paste 'paste_title))
+                           (switch-to-buffer-other-window (current-buffer)))))
+                       paste)))))
+
 (provide 'pastebin)
 ;;; pastebin.el ends herex
