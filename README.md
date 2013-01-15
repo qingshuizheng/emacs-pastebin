@@ -19,3 +19,11 @@
 # Wishlist 
    
 - Autoload major modes based on paste_format attribute while fetching a paste.
+
+# TODO
+
+- Docstring everthing
+- Remove useless code (Review)
+- Fix elpa stuff
+
+
