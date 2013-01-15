@@ -9,7 +9,8 @@
 
 # Features 
 
-- Get a list of yout pastes in a interactive buffer using pastebin-list-buffer command
+- The name of the current buffer is used as title to pastes
+- Get a list of your pastes in a interactive buffer using pastebin-list-buffer command
 - Open a paste by pressing RET on it at this buffer
 - Delete a paste by moving point to it and pressing `d'
 - Replace a paste using the command pastebin-replace. If there is no paste with the name of the current buffer a new one is selected. Note that the URL of the paste will change, just the name is keeped
