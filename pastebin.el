@@ -89,6 +89,9 @@
       (let ((oldpoint (point)))
         (pastebin-paste-delete (widget-get wid :paste))
         (pastebin-pastes-list-fetch)
+        (while (not pastebin-pastes-list)
+          (sleep-for 0.2))
+
         (pastebin-list-buffer)
         (goto-char oldpoint)
         )
@@ -211,6 +214,7 @@
 (defvar pastebin-map
   (let ((pastebin-map (make-sparse-keymap)))
     (define-key pastebin-map (kbd "d") 'pastebin-delete-paste-at-point)
+    (define-key pastebin-map (kbd "r") 'pastebin-list-buffer)
     pastebin-map)
   "Key map for pastebin list buffer")
 
@@ -369,6 +373,16 @@ different domain.
                            (message (format "Paste %s deleted" (pastebin-paste-get-attr paste 'paste_title)))))) 
                        paste)))))
 
+(defun pastebin-create-unused-buffer-name (name)
+  (let ((bname name)
+        (i 0))
+    (when (get-buffer bname)
+      (setq bname (format "%s<%d>" bname (setq i (1+ i))))
+      
+      (while (get-buffer bname)
+        (setq bname (replace-regexp-in-string "<[0-9]+>" (format "<%d>" (setq i (1+ i))) bname))))
+    bname))
+
 ;; FIXME: Set modes acordily to pastebin-type-assoc and update pastebin-pastes-list
 ;; Also handle the (buffer already in use) problem 
 ;; And handle the danm ^M characters
@@ -386,9 +400,16 @@ different domain.
                           (t
                            (re-search-forward "\n\n")
                            (kill-region (point-min) (point))
-                           (rename-buffer (pastebin-paste-get-attr paste 'paste_title))
+                           (while (re-search-forward "\r" nil t)
+                             (replace-match ""))
+                           (goto-char (point-min))
+                           (let ((paste-name (or (pastebin-paste-get-attr paste 'paste_title) 
+                                                 "_UNTITLED_")))
+                             (rename-buffer (pastebin-create-unused-buffer-name paste-name)))
                            (switch-to-buffer-other-window (current-buffer)))))
                        paste)))))
+
+
 
 ;; FIXME: I want to support deletion list from here. Untitled pastes
 ;; should be highlighted! Maybe I can retitle the paste from here?
