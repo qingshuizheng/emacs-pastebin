@@ -37,11 +37,28 @@
 ;;;   (setq pastebin-user-name "username")
 ;;;   (setq pastebin-password "password")
 ;;;
-;;;   (pastebin-login)
 ;;;
 ;;; To send the whole buffer or select region and run
 ;;;
 ;;;  M-x pastebin
+;;;
+;;; List pastes
+;;;
+;;;   M-x pastebin-list-buffer
+;;;
+;;;   On pastebin list buffer you have this binds
+;;;
+;;;   `d' Delete the paste at point
+;;;   `r' Reload the pastes list
+;;;   RET Open the paste on new buffer
+;;;
+;;; To replace a paste do the above. The paste will deleted
+;;; and posted again, this will change its key, and so the url.
+;;;
+;;;   M-x pastebin-replace
+;;;
+;;; The login will happen at first call to pastebin, pastebin-list-buffer
+;;; or pastebin-replace
 ;;;
 ;;; In either case the url that pastebin generates is left on the kill
 ;;; ring and the paste buffer.
@@ -58,6 +75,11 @@
   "Everybody using our API is required to use a valid Developer
  API Key. You automaticly get a key when you become a member of
  Pastebin. http://pastebin.com/api"
+  :type 'string
+  :group 'pastebin)
+
+(defcustom pastebin-user-api-key nil
+  "This is your login key, the function pastebin-login sets this."
   :type 'string
   :group 'pastebin)
 
@@ -83,6 +105,7 @@
 
 (defun pastebin-delete-paste-at-point ()
   (interactive)
+  (pastebin-login-if-not-already)
   (let ((wid (widget-at)))
     (if (not wid)
         (error "No paste at point")
@@ -98,6 +121,35 @@
       )
     )
   )
+
+(defun pastebin-login-if-not-already ()
+  "Log in if not already logged"
+  (unless pastebin-user-api-key
+    (pastebin-login-sync)))
+
+(defun pastebin-login-sync ()
+  "Do a synchronous login on pastebin, and set `PASTEBIN-USER-API-KEY'"
+  (let* ((params (concat "api_dev_key=" pastebin-unique-developer-api-key
+                         "&api_user_name=" (url-hexify-string pastebin-user-name)
+                         "&api_user_password=" (url-hexify-string pastebin-password)))
+         (url-request-method "POST")
+         (url-request-extra-headers
+          '(("Content-Type" . "application/x-www-form-urlencoded")))
+         (url-request-data params))
+    (with-current-buffer (url-retrieve-synchronously
+                          pastebin-post-request-login-url)
+      (strip-http-header)
+      (setq pastebin-user-api-key (buffer-substring-no-properties (point) (point-max))))))
+
+(defun strip-http-header (&optional buffer)
+  "Given a buffer with an HTTP response, remove the header and return the buffer
+If no buffer is given current buffer is used"
+  (let ((buffer (or buffer (current-buffer))))
+    (with-current-buffer buffer
+      (goto-char (point-min))
+      (re-search-forward "\n\n")
+    (kill-region (point-min) (point))
+    buffer)))
 
 (defun pastebin-login ()
   (let* ((params (concat "api_dev_key=" pastebin-unique-developer-api-key
@@ -239,6 +291,7 @@ different domain.
        (list (region-beginning) (region-end) nil)
      (list (point-min) (point-max) nil)))
   ;; Main function
+  (pastebin-login-if-not-already)
   (let* ((data (buffer-substring-no-properties start end))
          (params (concat "api_dev_key=" pastebin-unique-developer-api-key
                          "&api_user_key=" pastebin-user-api-key
@@ -311,7 +364,7 @@ different domain.
     (dolist (paste (pastebin-pastes))
       (when (string= paste-title (pastebin-paste-get-attr paste 'paste_title))
         (message "found")
-        (throw 'paste-found paste)))))
+        (throw 'paste-found paste))))) ;; kind of break
 
 (defun pastebin-pastes-list-expired? ()
   t)
@@ -332,6 +385,8 @@ different domain.
    (if (region-active-p)
        (list (region-beginning) (region-end) nil)
      (list (point-min) (point-max) nil)))
+
+  (pastebin-login-if-not-already)
 
   ;; Update list
   (when (pastebin-pastes-list-expired?)
@@ -415,6 +470,7 @@ different domain.
 ;; should be highlighted! Maybe I can retitle the paste from here?
 (defun pastebin-list-buffer ()
   (interactive)
+  (pastebin-login-if-not-already)
   (and (pastebin-pastes-list-expired?)
        (pastebin-pastes-list-fetch))
 
