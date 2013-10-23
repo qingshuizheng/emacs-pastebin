@@ -37,7 +37,6 @@
 ;;;   (setq pastebin-user-name "username")
 ;;;   (setq pastebin-password "password")
 ;;;
-;;;
 ;;; To send the whole buffer or select region and run
 ;;;
 ;;;  M-x pastebin
@@ -52,17 +51,30 @@
 ;;;   `r' Reload the pastes list
 ;;;   RET Open the paste on new buffer
 ;;;
-;;; To replace a paste do the above. The paste will deleted
-;;; and posted again, this will change its key, and so the url.
-;;;
+;;; To replace a paste open it and
+;;; 
 ;;;   M-x pastebin-replace
+;;;
+;;; The paste will deleted and posted again, this will change its key,
+;;; and so the url.
 ;;;
 ;;; The login will happen at first call to pastebin, pastebin-list-buffer
 ;;; or pastebin-replace
 ;;;
 ;;; In either case the url that pastebin generates is left on the kill
 ;;; ring and the paste buffer.
-
+;;;
+;;;
+;;; Pastebin minor mode (pastebin-buffer-mode)
+;;; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+;;;
+;;; A pastebin buffer is a buffer witch contents were retrieved from
+;;; pastebin with pastebin-list-buffer.
+;;;
+;;; Keybinds
+;;;
+;;; M-C-x M-C-s => [re-]upload the paste to pastebin.
+;;;
 
 ;;; Code:
 
@@ -102,6 +114,24 @@
   "Paste url"
   :type 'string
   :group 'pastebin)
+
+(defvar pastebin-buffer-paste nil
+  "The buffer local paste")
+(make-variable-buffer-local 'pastebin-buffer-paste)
+
+(define-minor-mode pastebin-buffer-mode
+  "Pastebin buffer mode, used to upload pastes automatically with S-C-x C-s"
+  :lighter " pastebin"
+  :group 'pastebin
+  :keymap (let ((map (make-sparse-keymap)))
+            (define-key map (kbd "M-C-x M-C-s") 'pastebin-save-buffer)
+            map))
+
+(defun pastebin-save-buffer ()
+  "Upload the buffer, replacing or creating a new one if needed"
+  (interactive)
+  (pastebin-replace (point-min) (point-max))
+  (set-buffer-modified-p nil))
 
 (defun pastebin-delete-paste-at-point ()
   "Delete a paste at point, in `pastebin-list-buffer' buffer"
@@ -266,11 +296,11 @@ Uses `pastebin-unique-developer-api-key', `pastebin-user-name', and `pastebin-pa
 
 (defvar pastebin-domain-history '())
 
-(defvar pastebin-map
-  (let ((pastebin-map (make-sparse-keymap)))
-    (define-key pastebin-map (kbd "d") 'pastebin-delete-paste-at-point)
-    (define-key pastebin-map (kbd "r") 'pastebin-list-buffer)
-    pastebin-map)
+(defvar pastebin-list-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "d") 'pastebin-delete-paste-at-point)
+    (define-key map (kbd "r") 'pastebin-list-buffer)
+    map)
   "Key map for pastebin list buffer")
 
 (defun pastebin (start end &optional name user-params)
@@ -345,10 +375,8 @@ different domain.
                           ((equal :error (car arg))
                            (signal 'pastebin-error (cdr arg)))
                           (t
-                           (re-search-forward "\n\n")
-                           (kill-region (point-min) (point))
-                           (goto-char (point-min))
-                           (while (re-search-forward "\r\n" nil t)
+                           (strip-http-header)
+                           (while (re-search-forward "\r\n" nil t) ;; remove damn ^M 
                              (replace-match ""))
                            (goto-char (point-min))
                            (insert "<root>")
@@ -378,7 +406,8 @@ different domain.
   "Return t if `pastebin-pastes-list' is considered too old"
   t)
 
-(defvar pastebin-pastes-list nil)
+(defvar pastebin-pastes-list nil
+  "The list of pastes generated from `xml-parse-region' at `pastebin-pastes-fetch'")
 
 ;; FIXME: When I ran this, I loose the paste key
 ;; I need to keep paste's keys between replaces
@@ -457,9 +486,9 @@ Ex: (pastebin-paste-get-attr (pastebin-pastes-nth 0) 'paste_tittle)"
         (setq bname (replace-regexp-in-string "<[0-9]+>" (format "<%d>" (setq i (1+ i))) bname))))
     bname))
 
-;; FIXME: Set modes acordily to pastebin-type-assoc and update pastebin-pastes-list
-;; Also handle the (buffer already in use) problem 
-;; And handle the danm ^M characters
+;;
+;; DEPRECATED use pastebin-paste-fetch-sync
+;;
 (defun pastebin-paste-fetch (paste)
   "Fetch `paste' from pastebin.com, create a buffer and switch to it"
   (let* ((paste-url (concat "http://pastebin.com/raw.php?i=" (pastebin-paste-get-attr paste 'paste_key)))
@@ -473,18 +502,39 @@ Ex: (pastebin-paste-get-attr (pastebin-pastes-nth 0) 'paste_tittle)"
                           ((equal :error (car arg))
                            (signal 'pastebin-error (cdr arg)))
                           (t
-                           (re-search-forward "\n\n")
-                           (kill-region (point-min) (point))
-                           (while (re-search-forward "\r" nil t)
+                           (strip-http-header)
+                           (goto-char (point-min))
+                           (while (re-search-forward "\r" nil t) ;; remove damn ^M 
                              (replace-match ""))
                            (goto-char (point-min))
                            (let ((paste-name (or (pastebin-paste-get-attr paste 'paste_title) 
                                                  "_UNTITLED_")))
                              (rename-buffer (pastebin-create-unused-buffer-name paste-name)))
+                           (pastebin-buffer-mode 1)
+                           (set (make-local-variable 'paste) paste)
                            (switch-to-buffer-other-window (current-buffer)))))
                        paste)))))
 
-
+;; FIXME: Handle possible HTTP errors
+;;        I can read the header for that before calling (string-http-header)
+(defun pastebin-paste-fetch-sync (paste)
+  "Fetch `paste' from pastebin.com synchronously"
+  (let* ((paste-url (concat "http://pastebin.com/raw.php?i=" (pastebin-paste-get-attr paste 'paste_key)))
+         (paste-mode (car (rassoc (pastebin-paste-get-attr paste 'paste_format_short) pastebin-type-assoc)))
+         (url-request-method "POST")
+         (url-request-extra-headers
+          '(("Content-Type" . "application/x-www-form-urlencoded")))
+         (content-buf (url-retrieve-synchronously paste-url))
+         (new-buffer (get-buffer-create (pastebin-create-unused-buffer-name (or (pastebin-paste-get-attr paste 'paste_title)
+                                                 "_UNTITLED_")))))
+    (with-current-buffer new-buffer
+      (strip-http-header content-buf)
+      (insert-buffer content-buf)
+      (when paste-mode
+        (funcall paste-mode)) ;; sets the major mode if exists
+      (pastebin-buffer-mode 1)
+      (setq pastebin-buffer-paste paste) ;; buffer local 
+      (switch-to-buffer (current-buffer)))))
 
 ;; FIXME: I want to support deletion list from here. Untitled pastes
 ;; should be highlighted! Maybe I can retitle the paste from here?
@@ -504,14 +554,14 @@ Some keybinds are setted"
       (erase-buffer))
 
     (widget-minor-mode 1)
-    (use-local-map pastebin-map)
+    (use-local-map pastebin-list-map)
 
     (widget-insert (format "%5.5s | %-8.8s | %-32.32s | %-7.7s | %-15.15s\n"
                            "VIEW" "ID" "TITLE" "SYNTAX" "DATE"))
     (dolist (paste (pastebin-pastes))
       (widget-create 'link 
                      :notify (lambda (wid &rest ignore)
-                               (pastebin-paste-fetch (widget-get wid :paste)))
+                               (pastebin-paste-fetch-sync (widget-get wid :paste)))
                      :paste paste
                      :follow-link t
                      :value (format "%4.4s | %-8.8s | %-32.32s | %-7.7s | %-20.20s"
