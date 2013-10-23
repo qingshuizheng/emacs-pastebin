@@ -16,15 +16,11 @@
 - Replace a paste using the command pastebin-replace. If there is no paste with the name of the current buffer a new one is create. Note that the URL of the paste will change, just the name is keeped
 - Refresh the list by pressing 'r'
 - The login will go on only when you call an interactive function, avoiding anoying long emacs load time
+- Autoload major modes based on paste_format attribute while fetching a paste.
 
 # Wishlist 
-   
-- Autoload major modes based on paste_format attribute while fetching a paste.
 
 # TODO
 
-- Docstring everthing
 - Remove useless code (Review)
 - Fix elpa stuff
-
-
