@@ -104,6 +104,7 @@
   :group 'pastebin)
 
 (defun pastebin-delete-paste-at-point ()
+  "Delete a paste at point, in `pastebin-list-buffer' buffer"
   (interactive)
   (pastebin-login-if-not-already)
   (let ((wid (widget-at)))
@@ -128,7 +129,7 @@
     (pastebin-login-sync)))
 
 (defun pastebin-login-sync ()
-  "Do a synchronous login on pastebin, and set `PASTEBIN-USER-API-KEY'"
+  "Do a synchronous login on pastebin, and set `pastebin-user-api-key'"
   (let* ((params (concat "api_dev_key=" pastebin-unique-developer-api-key
                          "&api_user_name=" (url-hexify-string pastebin-user-name)
                          "&api_user_password=" (url-hexify-string pastebin-password)))
@@ -152,6 +153,8 @@ If no buffer is given current buffer is used"
     buffer)))
 
 (defun pastebin-login ()
+  "Asynchronous login
+Uses `pastebin-unique-developer-api-key', `pastebin-user-name', and `pastebin-password'"
   (let* ((params (concat "api_dev_key=" pastebin-unique-developer-api-key
                          "&api_user_name=" (url-hexify-string pastebin-user-name)
                          "&api_user_password=" (url-hexify-string pastebin-password)))
@@ -324,6 +327,7 @@ different domain.
                            (message "Pastebin URL: %s" (buffer-substring (point) (point-max)))))))))))
 
 (defun pastebin-pastes-list-fetch (&optional limit)
+  "Fetches a list of pastes and save on `pastebin-pastes-list'"
   (setq pastebin-pastes-list nil)
   (let* ((params (concat "api_dev_key=" pastebin-unique-developer-api-key
                          "&api_user_key=" pastebin-user-api-key
@@ -353,20 +357,25 @@ different domain.
                            (setq pastebin-pastes-list (xml-parse-region (point-min) (point-max)))))))))))
 
 (defmacro pastebin-pastes ()
+  "Return the list from `pastebin-pastes-list', without root and such"
   `(nthcdr 2 (car pastebin-pastes-list)))
 
 (defmacro pastebin-pastes-foreach-paste (&rest body)
+  "Iterates over `pastebin-pastes-list' with `paste' pointing to current paste"
   `(dolist (paste (pastebin-pastes))
      ,@body))
 
 (defun pastebin-pastes-find-by-title (paste-title)
+  "Given a `paste-title' return the paste from `pastebin-pastes-list'"
   (catch 'paste-found
     (dolist (paste (pastebin-pastes))
       (when (string= paste-title (pastebin-paste-get-attr paste 'paste_title))
         (message "found")
         (throw 'paste-found paste))))) ;; kind of break
 
+;; @TODO
 (defun pastebin-pastes-list-expired? ()
+  "Return t if `pastebin-pastes-list' is considered too old"
   t)
 
 (defvar pastebin-pastes-list nil)
@@ -381,6 +390,7 @@ different domain.
 ;; really replaced, if not I need to alert user to open
 ;; url retrieved from Pastebin and feed the captcha
 (defun pastebin-replace (b e &optional name)
+  "Replace a paste on pastebin.com based on current buffer"
   (interactive
    (if (region-active-p)
        (list (region-beginning) (region-end) nil)
@@ -404,12 +414,20 @@ different domain.
   )
 
 (defun pastebin-pastes-nth (nth)
+  "Return `nth' paste from `pastebin-pastes-list'"
   (elt (pastebin-pastes) nth))
 
 (defun pastebin-paste-get-attr (paste attr)
+  "Return the attribute `attr' from `paste'
+Attributes are described here: http://pastebin.com/api#9
+`attr' is a symbol
+Ex: (pastebin-paste-get-attr (pastebin-pastes-nth 0) 'paste_tittle)"
+  (unless (symbolp attr)
+    (signal 'wrong-type-argument ("`attr' should be a symbol")))
   (car (last (assoc attr paste))))
 
 (defun pastebin-paste-delete (paste)
+  "Delete paste from pastebin.com"
   (let* ((params (concat "api_dev_key=" pastebin-unique-developer-api-key
                          "&api_user_key=" pastebin-user-api-key
                          "&api_paste_key=" (pastebin-paste-get-attr paste 'paste_key)
@@ -429,6 +447,7 @@ different domain.
                        paste)))))
 
 (defun pastebin-create-unused-buffer-name (name)
+  "Create a uniq buffer name, based on `name'<N>"
   (let ((bname name)
         (i 0))
     (when (get-buffer bname)
@@ -442,6 +461,7 @@ different domain.
 ;; Also handle the (buffer already in use) problem 
 ;; And handle the danm ^M characters
 (defun pastebin-paste-fetch (paste)
+  "Fetch `paste' from pastebin.com, create a buffer and switch to it"
   (let* ((paste-url (concat "http://pastebin.com/raw.php?i=" (pastebin-paste-get-attr paste 'paste_key)))
          (url-request-method "POST")
          (url-request-extra-headers
@@ -469,6 +489,8 @@ different domain.
 ;; FIXME: I want to support deletion list from here. Untitled pastes
 ;; should be highlighted! Maybe I can retitle the paste from here?
 (defun pastebin-list-buffer ()
+  "Create a buffer with a list of pastes and switch to it
+Some keybinds are setted"
   (interactive)
   (pastebin-login-if-not-already)
   (and (pastebin-pastes-list-expired?)
