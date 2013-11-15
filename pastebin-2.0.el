@@ -1,8 +1,3 @@
-;; This buffer is for notes you don't want to save, and for Lisp evaluation.
-;; If you want to create a file, visit that file with C-x C-f,
-;; then enter the text in that file's own buffer.
-
-
 (defgroup pastebin nil
   "Pastebin -- pastebin.com client"
   :tag "Pastebin"
@@ -29,6 +24,7 @@
    (password :initarg :password "Your password, clear text honey!!")
    (username :initarg :username "Your username")
    (paste-list :initarg :paste-list "The list of pastes for this user")
+   (list-buffer :initarg :list-buffer "Done by do-list-buffer")
   ))
 
 (defmethod login ((user paste-user))
@@ -44,24 +40,44 @@
            (url-request-data params))
       (with-current-buffer (url-retrieve-synchronously pastebin-post-request-login-url)
         (strip-http-header)
-        (oset user :usr-key (buffer-substring-no-properties (point-min) (point-max)))
-        (switch-to-buffer (current-buffer))))))
+        (oset user :usr-key (buffer-substring-no-properties (point-min) (point-max)))))))
+
 
 (defmethod assign-buffer ((p paste) buf)
+  "Assing if not already assigned"
   (if (slot-boundp p :buffer)
       (oref p :buffer)
     (oset p :buffer buf)))
 
-(defmethod fetch ((p paste) &optional dont-set-buffer)
+(defmethod paste-fetch ((p paste) &optional dont-set-buffer)
   "Fetch the raw content from paste and return buffer containing"
-  (let* ((url-request-method "POST")
-         (url-request-extra-headers '(("Content-Type" . "application/x-www-form-urlencoded")))
-         (url-request-data params))
-    (with-current-buffer (url-retrieve (concat pastebin-raw-paste-url (oref p key)))
+  (let* ((url-request-method "GET")
+         (url-request-extra-headers '(("Content-Type" . "application/x-www-form-urlencoded"))))
+    (with-current-buffer (url-retrieve-synchronously (concat pastebin-raw-paste-url (oref p key)))
       (strip-http-header)
       (unless dont-set-buffer
         (assign-buffer p (current-buffer)))
+      (setq pastebin-local-buffer-paste p) ;; buffer local
       (current-buffer))))
+
+;; TODO
+(defmethod paste-delete ((p paste))
+  "Detele paste from pastebin.com")
+
+;; TODO
+(cl-defun pastebin-new-paste (&key title syntax private)
+  "Upload a new paste to pastebin.com
+Retrieve the paste object from pastebin
+Add the object to user's pastes list
+Set the pastebin-minor-mode on current buffer
+Return the paste object"
+  )
+
+(defmethod fetch-and-process ((p paste))
+  "Fetch buffer a do needed processing before switching to it"
+  (with-current-buffer (paste-fetch p)
+    (switch-to-buffer (current-buffer))))
+    
 
 (defmethod fetch-list-xml ((user paste-user) &optional count)
   (let* ((params (concat "api_dev_key=" (oref user dev-key)
@@ -79,9 +95,6 @@
       (current-buffer)
       )))
 
-(setq me (paste-user "Me" :dev-key pastebin-unique-developer-api-key
-                          :password pastebin-password
-                          :username pastebin-user-name))
 
 (defmethod set-paste-list ((user paste-user) &optional count)
   "Set paste-list attr to the list of paste objects retrieved from pastebin.com"
@@ -99,6 +112,7 @@
                                        :expire_date (pastebin-paste-sexp-get-attr-h p 'paste_expire_date)
                                        :private (pastebin-paste-sexp-get-attr-h p 'paste_private)
                                        :format_long (pastebin-paste-sexp-get-attr-h p 'paste_format_long)
+                                       :format_short (pastebin-paste-sexp-get-attr-h p 'paste_format_short)
                                        :url (pastebin-paste-sexp-get-attr-h p 'paste_url)
                                        :buffer (current-buffer)
                                        :last-fetched (float-time)
@@ -115,6 +129,91 @@ Ex: (pastebin-paste-get-attr (pastebin-pastes-nth 0) 'paste_tittle)"
   (unless (symbolp attr)
     (signal 'wrong-type-argument ("`attr' should be a symbol")))
   (car (last (assoc attr (nthcdr 2 (car paste-sexp))))))
+
+(defcustom pastebin-type-assoc
+  '((actionscript-mode . " actionscript")
+    (ada-mode . "ada")
+    (asm-mode . "asm")
+    (autoconf-mode . "bash")
+    (bibtex-mode . "bibtex")
+    (cmake-mode . "cmake")
+    (c-mode . "c")
+    (c++-mode . "cpp")
+    (cobol-mode . "cobol")
+    (conf-colon-mode . "properties")
+    (conf-javaprop-mode . "properties")
+    (conf-mode . "ini")
+    (conf-space-mode . "properties")
+    (conf-unix-mode . "ini")
+    (conf-windows-mode . "ini")
+    (cperl-mode . "perl")
+    (csharp-mode . "csharp")
+    (css-mode . "css")
+    (delphi-mode . "delphi")
+    (diff-mode . "dff")
+    (ebuild-mode . "bash")
+    (eiffel-mode . "eiffel")
+    (emacs-lisp-mode . "lisp")
+    (erlang-mode . "erlang")
+    (erlang-shell-mode . "erlang")
+    (espresso-mode . "javascript")
+    (fortran-mode . "fortran")
+    (glsl-mode . "glsl")
+    (gnuplot-mode . "gnuplot")
+    (graphviz-dot-mode . "dot")
+    (haskell-mode . "haskell")
+    (html-mode . "html4strict")
+    (idl-mode . "idl")
+    (inferior-haskell-mode . "haskell")
+    (inferior-octave-mode . "octave")
+    (inferior-python-mode . "python")
+    (inferior-ruby-mode . "ruby")
+    (java-mode . "java")
+    (js2-mode . "javascript")
+    (jython-mode . "python")
+    (latex-mode . "latex")
+    (lisp-mode . "lisp")
+    (lua-mode . "lua")
+    (makefile-mode . "make")
+    (makefile-automake-mode . "make")
+    (makefile-gmake-mode . "make")
+    (makefile-makepp-mode . "make")
+    (makefile-bsdmake-mode . "make")
+    (makefile-imake-mode . "make")
+    (matlab-mode . "matlab")
+    (nxml-mode . "xml")
+    (oberon-mode . "oberon2")
+    (objc-mode . "objc")
+    (ocaml-mode . "ocaml")
+    (octave-mode . "matlab")
+    (pascal-mode . "pascal")
+    (perl-mode . "perl")
+    (php-mode . "php")
+    (plsql-mode . "plsql")
+    (po-mode . "gettext")
+    (prolog-mode . "prolog")
+    (python-2-mode . "python")
+    (python-3-mode . "python")
+    (python-basic-mode . "python")
+    (python-mode . "python")
+    (ruby-mode . "ruby")
+    (scheme-mode . "lisp")
+    (shell-mode . "bash")
+    (sh-mode . "bash")
+    (smalltalk-mode . "smalltalk")
+    (sql-mode . "sql")
+    (tcl-mode . "tcl")
+    (visual-basic-mode . "vb")
+    (xml-mode . "xml")
+    (yaml-mode . "properties")
+    (text-mode . "text"))
+  "Alist composed of major-mode names and corresponding pastebin highlight formats."
+  :type '(alist :key-type symbol :value-tupe string)
+  :group 'pastebin)
+
+(defvar pastebin-local-buffer-paste nil
+  "Every pastebin buffer has a paste object associated with it")
+(make-variable-buffer-local 'pastebin-local-buffer-paste)
 
 (defconst pastebin-raw-paste-url "http://pastebin.com/raw.php?i="
   "Concatenate this with paste key to get the raw paste")
@@ -153,9 +252,82 @@ If no buffer is given current buffer is used"
     (kill-region (point-min) (point))
     buffer)))
 
+(defvar pastebin-list-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "d") 'pastebin-delete-paste-at-point) ;; TODO 
+    (define-key map (kbd "r") 'pastebin-list-buffer) ;; TODO refresh pastebin list buffer
+    map)
+  "Key map for pastebin list buffer")
+
+(defun pastebin-get-paste-at-point ()
+  "Get the paste at point at current-buffer"
+  (let ((wid (widget-at)))
+    (if (not wid)
+        (error "No paste at point")
+      (widget-get wid :paste))))
+
+(defun pastebin-fetch-paste-at-point ()
+  "Fetch and switch to paste at point"
+  (let ((paste (pastebin-get-paste-at-point)))
+    (fetch-and-process paste)))
+    
+;; TODO: Implement dired here
+(defmethod do-list-buffer ((user paste-user))
+  "Create a buffer with a list of pastes and switch to it
+Some keybinds are setted"
+  (interactive)
+
+  (login user)
+  
+  (unless (slot-boundp user :list-buffer)
+    (message "Bouding :list-buffer")
+    (oset user :list-buffer 
+          (get-buffer-create (format "* Pastebin %s List *" (oref user :username)))))
+  
+  ;; fetch pastes list
+  (set-paste-list user)
+
+  (with-current-buffer (get-buffer (oref user :list-buffer))
+
+    (let ((inhibit-read-only t))
+      (erase-buffer))
+
+    (widget-minor-mode 1)
+    (use-local-map pastebin-list-map)
+
+    (widget-insert (format "%5.5s | %-8.8s | %-32.32s | %-7.7s | %-15.15s\n"
+                           "VIEW" "ID" "TITLE" "SYNTAX" "DATE"))
+    (dolist (paste (oref user :paste-list))
+      (widget-create 'link 
+                     :notify (lambda (wid &rest ignore)
+                               (pastebin-fetch-paste-at-point))
+                     :paste paste
+                     :follow-link t
+                     :value (format "%4.4s | %-8.8s | %-32.32s | %-7.7s | %-20.20s"
+                                    (if (string= (oref paste :private) "1")
+                                        "PRIV"
+                                      "PUBL")
+                                    (oref paste :key)
+                                    (or (oref paste :title) "")
+                                    (oref paste :format_short)
+                                    (format-time-string "%c" (seconds-to-time (string-to-number (oref paste :date))))
+                                    )
+                     )
+
+      (widget-insert "\n")
+      )
+    (widget-setup)
+    (goto-char (point-min))
+    (switch-to-buffer (current-buffer))
+    )
+  )
+
+(setq me (paste-user "Me" :dev-key pastebin-unique-developer-api-key
+                          :password pastebin-password
+                          :username pastebin-user-name))
 
 
+(login me)
+(do-list-buffer me)
 
-
-
-
+(provide 'pastebin-2.0)
