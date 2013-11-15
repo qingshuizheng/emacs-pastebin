@@ -15,6 +15,7 @@
    (url :initarg :url)
    (buffer :initarg :buffer)
    (last-fetched :initarg :last-fetched)
+   (user :initarg :user)
    (hits :initarg :hits))
   "a paste")
 
@@ -62,15 +63,43 @@
 
 ;; TODO
 (defmethod paste-delete ((p paste))
-  "Detele paste from pastebin.com")
+  "Detele paste from pastebin.com"
+  (let* ((params (concat "api_dev_key=" (oref (oref p :user) :dev-key)
+                         "&api_user_key=" (oref (oref p :user) :usr-key)
+                         "&api_paste_key=" (oref p :key)
+                         "&api_option=delete"))
+         (url-request-method "POST")
+         (url-request-extra-headers
+          '(("Content-Type" . "application/x-www-form-urlencoded")))
+         (url-request-data params))
+    (with-current-buffer (url-retrieve-synchronously pastebin-post-request-paste-url)
+      (current-buffer))
+    ))
 
 ;; TODO
-(cl-defun pastebin-new-paste (&key title syntax private)
+(defmethod paste-new ((user paste-user) &optional &key title syntax private buffer)
   "Upload a new paste to pastebin.com
 Retrieve the paste object from pastebin
-Add the object to user's pastes list
-Set the pastebin-minor-mode on current buffer
-Return the paste object"
+Refresh paste-list for user
+Set the pastebin-minor-mode on current buffer"
+  (let* ((ptitle (or title (buffer-name)))
+         (pbuffer (or buffer (current-buffer)))
+         (psyntax (or syntax "text"))
+         (pprivate (or private "0"))
+         (params (concat "api_dev_key=" (oref user :dev-key)
+                         "&api_user_key=" (oref user :usr-key)
+                         "&api_paste_name=" ptitle
+                         "&api_paste_code=" (url-hexify-string (with-current-buffer pbuffer
+                                                                 (buffer-string)))
+                         "&api_option=paste"
+                         "&api_paste_private=" pprivate))
+         (url-request-method "POST")
+         (url-request-extra-headers
+          '(("Content-Type" . "application/x-www-form-urlencoded")))
+         (url-request-data params))
+    (with-current-buffer (url-retrieve-synchronously pastebin-post-request-paste-url)
+      (strip-http-header)
+      (buffer-string)))
   )
 
 (defmethod fetch-and-process ((p paste))
@@ -95,8 +124,7 @@ Return the paste object"
       (current-buffer)
       )))
 
-
-(defmethod set-paste-list ((user paste-user) &optional count)
+(defmethod refresh-paste-list ((user paste-user) &optional count)
   "Set paste-list attr to the list of paste objects retrieved from pastebin.com"
   (with-current-buffer (fetch-list-xml me count)
     (goto-char (point-min))
@@ -116,9 +144,13 @@ Return the paste object"
                                        :url (pastebin-paste-sexp-get-attr-h p 'paste_url)
                                        :buffer (current-buffer)
                                        :last-fetched (float-time)
+                                       :user user
                                        :hits (pastebin-paste-sexp-get-attr-h p 'paste_hits)) plist))
               (setq i (point))))
-          (oset user :paste-list plist))
+          (oset user :paste-list (sort plist (lambda (p1 p2)
+                                                (not (string< (oref p1 :date)
+                                                              (oref p2 :date)))))))
+
         (error "Cant parse any paste"))))
 
 (defun pastebin-paste-sexp-get-attr-h (paste-sexp attr)
@@ -215,6 +247,10 @@ Ex: (pastebin-paste-get-attr (pastebin-pastes-nth 0) 'paste_tittle)"
   "Every pastebin buffer has a paste object associated with it")
 (make-variable-buffer-local 'pastebin-local-buffer-paste)
 
+(defvar pastebin-list-buffer-user nil
+  "Every pastebin list buffer has a user object associated with it")
+(make-variable-buffer-local 'pastebin-list-buffer-user)
+
 (defconst pastebin-raw-paste-url "http://pastebin.com/raw.php?i="
   "Concatenate this with paste key to get the raw paste")
 
@@ -255,16 +291,29 @@ If no buffer is given current buffer is used"
 (defvar pastebin-list-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "d") 'pastebin-delete-paste-at-point) ;; TODO 
-    (define-key map (kbd "r") 'pastebin-list-buffer) ;; TODO refresh pastebin list buffer
-    map)
+    (define-key map (kbd "r") 'pastebin-list-buffer-refresh) ;; TODO refresh pastebin list buffer
+    map)p
   "Key map for pastebin list buffer")
 
+(defun pastebin-list-buffer-refresh ()
+  "Refresh the list buffer screen
+Operates on current buffer"
+  (interactive)
+  (do-list-buffer pastebin-list-buffer-user))
+  
 (defun pastebin-get-paste-at-point ()
   "Get the paste at point at current-buffer"
   (let ((wid (widget-at)))
     (if (not wid)
         (error "No paste at point")
       (widget-get wid :paste))))
+
+(defun pastebin-delete-paste-at-point ()
+  "Delete the paste at point"
+  (interactive)
+  (let ((paste (pastebin-get-paste-at-point)))
+    (paste-delete paste)
+    (pastebin-list-buffer-refresh))
 
 (defun pastebin-fetch-paste-at-point ()
   "Fetch and switch to paste at point"
@@ -279,13 +328,11 @@ Some keybinds are setted"
 
   (login user)
   
-  (unless (slot-boundp user :list-buffer)
-    (message "Bouding :list-buffer")
-    (oset user :list-buffer 
-          (get-buffer-create (format "* Pastebin %s List *" (oref user :username)))))
+  (oset user :list-buffer 
+        (get-buffer-create (format "*Pastebin %s List*" (oref user :username))))
   
   ;; fetch pastes list
-  (set-paste-list user)
+  (refresh-paste-list user)
 
   (with-current-buffer (get-buffer (oref user :list-buffer))
 
@@ -294,8 +341,10 @@ Some keybinds are setted"
 
     (widget-minor-mode 1)
     (use-local-map pastebin-list-map)
+    
+    (setq pastebin-list-buffer-user user)
 
-    (widget-insert (format "%5.5s | %-8.8s | %-32.32s | %-7.7s | %-15.15s\n"
+    (widget-insert (format "%5.5s | %-8.8s | %-32.32s | %-7.7s | %-30.30s\n"
                            "VIEW" "ID" "TITLE" "SYNTAX" "DATE"))
     (dolist (paste (oref user :paste-list))
       (widget-create 'link 
@@ -329,5 +378,7 @@ Some keybinds are setted"
 
 (login me)
 (do-list-buffer me)
+
+(paste-new me)
 
 (provide 'pastebin-2.0)
