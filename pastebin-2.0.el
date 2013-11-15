@@ -20,7 +20,6 @@
    (user :initarg :user)
    (hits :initarg :hits)))
 
-
 (defmethod assign-buffer ((p paste) buf)
   "Assing if not already assigned"
   (if (slot-boundp p :buffer)
@@ -41,6 +40,12 @@
 ;; TODO
 (defmethod paste-delete ((p paste))
   "Detele paste from pastebin.com"
+  (unless (and (slot-boundp p :user)
+               (slot-boundp p :key)
+               (slot-boundp (oref p :user) :dev-key) 
+               (slot-boundp (oref p :user) :usr-key))
+    (signal 'unbound-error "paste-delete called with ubound slot object"))
+
   (let* ((params (concat "api_dev_key=" (oref (oref p :user) :dev-key)
                          "&api_user_key=" (oref (oref p :user) :usr-key)
                          "&api_paste_key=" (oref p :key)
@@ -50,8 +55,11 @@
           '(("Content-Type" . "application/x-www-form-urlencoded")))
          (url-request-data params))
     (with-current-buffer (url-retrieve-synchronously pastebin-post-request-paste-url)
-      (current-buffer))
+      (strip-http-header)
+      (buffer-string))
     ))
+
+
 
 ;; PASTE-USER class
 
@@ -63,6 +71,9 @@
    (paste-list :initarg :paste-list "The list of pastes for this user")
    (buffer-hash :initarg :list-buffer "Done by do-list-buffer")
   ))
+
+(defmethod is-logged ((user paste-user))
+  (slot-boundp user :usr-key))
 
 (defmethod fetch-list-xml ((user paste-user) &optional count)
   "Fetch the list of pastes as xml, and return that buffer"
@@ -82,10 +93,10 @@
 
 (defmethod refresh-paste-list ((user paste-user) &optional count)
   "Set/Refresh paste-list attr to the list of paste objects retrieved from pastebin.com"
+  (oset user :paste-list nil)
   (with-current-buffer (fetch-list-xml user (or count pastebin-default-paste-list-limit))
     (goto-char (point-min))
-    (let ((i (point-min))
-          plist)
+    (let ((i (point-min)))
       (while (re-search-forward "</paste>" nil t)
         (let ((paste-sexp (xml-parse-region i (point))))
           (setq i (point))
@@ -100,25 +111,21 @@
                                :format_short (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_format_short)
                                :url (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_url)
                                :last-fetched (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_last-fetched)
-                               :user user) plist)
+                               :user user) (oref user :paste-list))
           )
         )
-      plist
       )
     )
   )
-
-
-;; (setq paste-sexp '((paste nil (paste_key nil A96vA23q) (paste_date nil 1384544651) (paste_title nil *scratch*) (paste_size nil 191) (paste_expire_date nil 0) (paste_private nil 1) (paste_format_long nil None) (paste_format_short nil text) (paste_url nil http://pastebin.com/A96vA23q) (paste_hits nil 0))))
-
 
 (defmethod do-list-buffer ((user paste-user))
   "Create a buffer with a list of pastes and return it
 Some keybinds are setted"
   (interactive)
 
-  (login user)
-  
+  (unless (is-logged user)
+    (signal 'unlogged-user "do-list-buffer called with not logged user"))
+
   (oset user :list-buffer 
         (get-buffer-create (format "*Pastebin %s List*" (oref user :username))))
   
@@ -394,28 +401,25 @@ If no buffer is given current buffer is used"
 
 ;; User interface 
 
-;; FIXME: Error when call from pastebin-delete-paste-at-point
+
 (defun pastebin-list-buffer-refresh ()
   "Refresh the list buffer screen
 Operates on current buffer"
   (interactive)
-  (refresh-paste-list pastebin-default-user)
   (switch-to-buffer (do-list-buffer pastebin-default-user)))
   
-;; FIXME
+;; FIXME, pastebin-list-buffer-refresh cracks here
 (defun pastebin-delete-paste-at-point ()
   "Delete the paste at point"
   (interactive)
   (let ((paste (pastebin-get-paste-at-point)))
-    (paste-delete paste)
-    (refresh-paste-list pastebin-default-user 100)
-    (do-list-buffer pastebin-default-user)))
-
+    (message "%s" (paste-delete paste))
+    (pastebin-list-buffer-refresh)))
 
 (defun pastebin-new ()
   "Create a new paste from buffer"
   (interactive)
-  (paste-new pastebin-default-user))
+  (message "URL %s" (paste-new pastebin-default-user)))
 
 (pastebin-do-login :dev-key pastebin-unique-developer-api-key
                    :password pastebin-password
@@ -423,3 +427,8 @@ Operates on current buffer"
 
 
 (provide 'pastebin-2.0)
+
+
+
+;; (refresh-paste-list pastebin-default-user)
+;; (setq paste-sexp '((paste nil (paste_key nil A96vA23q) (paste_date nil 1384544651) (paste_title nil *scratch*) (paste_size nil 191) (paste_expire_date nil 0) (paste_private nil 1) (paste_format_long nil None) (paste_format_short nil text) (paste_url nil http://pastebin.com/A96vA23q) (paste_hits nil 0))))
