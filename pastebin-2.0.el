@@ -1,8 +1,16 @@
+;; 
+;; Pastebin.com interface to emacs
+;;
+;; Author: Daniel Hilst Selli danielhilst at gmail.com
+;;
+
+(require 'eieio)
+(require 'cl)
+
 (defgroup pastebin nil
   "Pastebin -- pastebin.com client"
   :tag "Pastebin"
   :group 'tools)
-
 
 ;; PASTE-USER class
 
@@ -126,10 +134,6 @@ Some keybinds are setted"
         (strip-http-header)
         (oset user :usr-key (buffer-substring-no-properties (point-min) (point-max)))))))
 
-
-
-
-;; TODO
 (defmethod paste-new ((user paste-user) &optional &key title syntax private buffer)
   "Upload a new paste to pastebin.com
 Retrieve the paste object from pastebin
@@ -213,87 +217,6 @@ Set the pastebin-minor-mode on current buffer"
 
 ;; Local variables and customs
 
-(defcustom pastebin-type-assoc
-  '((actionscript-mode . " actionscript")
-    (ada-mode . "ada")
-    (asm-mode . "asm")
-    (autoconf-mode . "bash")
-    (bibtex-mode . "bibtex")
-    (cmake-mode . "cmake")
-    (c-mode . "c")
-    (c++-mode . "cpp")
-    (cobol-mode . "cobol")
-    (conf-colon-mode . "properties")
-    (conf-javaprop-mode . "properties")
-    (conf-mode . "ini")
-    (conf-space-mode . "properties")
-    (conf-unix-mode . "ini")
-    (conf-windows-mode . "ini")
-    (cperl-mode . "perl")
-    (csharp-mode . "csharp")
-    (css-mode . "css")
-    (delphi-mode . "delphi")
-    (diff-mode . "dff")
-    (ebuild-mode . "bash")
-    (eiffel-mode . "eiffel")
-    (emacs-lisp-mode . "lisp")
-    (erlang-mode . "erlang")
-    (erlang-shell-mode . "erlang")
-    (espresso-mode . "javascript")
-    (fortran-mode . "fortran")
-    (glsl-mode . "glsl")
-    (gnuplot-mode . "gnuplot")
-    (graphviz-dot-mode . "dot")
-    (haskell-mode . "haskell")
-    (html-mode . "html4strict")
-    (idl-mode . "idl")
-    (inferior-haskell-mode . "haskell")
-    (inferior-octave-mode . "octave")
-    (inferior-python-mode . "python")
-    (inferior-ruby-mode . "ruby")
-    (java-mode . "java")
-    (js2-mode . "javascript")
-    (jython-mode . "python")
-    (latex-mode . "latex")
-    (lisp-mode . "lisp")
-    (lua-mode . "lua")
-    (makefile-mode . "make")
-    (makefile-automake-mode . "make")
-    (makefile-gmake-mode . "make")
-    (makefile-makepp-mode . "make")
-    (makefile-bsdmake-mode . "make")
-    (makefile-imake-mode . "make")
-    (matlab-mode . "matlab")
-    (nxml-mode . "xml")
-    (oberon-mode . "oberon2")
-    (objc-mode . "objc")
-    (ocaml-mode . "ocaml")
-    (octave-mode . "matlab")
-    (pascal-mode . "pascal")
-    (perl-mode . "perl")
-    (php-mode . "php")
-    (plsql-mode . "plsql")
-    (po-mode . "gettext")
-    (prolog-mode . "prolog")
-    (python-2-mode . "python")
-    (python-3-mode . "python")
-    (python-basic-mode . "python")
-    (python-mode . "python")
-    (ruby-mode . "ruby")
-    (scheme-mode . "lisp")
-    (shell-mode . "bash")
-    (sh-mode . "bash")
-    (smalltalk-mode . "smalltalk")
-    (sql-mode . "sql")
-    (tcl-mode . "tcl")
-    (visual-basic-mode . "vb")
-    (xml-mode . "xml")
-    (yaml-mode . "properties")
-    (text-mode . "text"))
-  "Alist composed of major-mode names and corresponding pastebin highlight formats."
-  :type '(alist :key-type symbol :value-tupe string)
-  :group 'pastebin)
-
 (defvar pastebin-default-paste-list-limit 100
   "The number of pastes to retrieve by default")
 
@@ -346,17 +269,6 @@ Ex: (pastebin-paste-get-attr (pastebin-pastes-nth 0) 'paste_tittle)"
     (unless a
       (error "No attribute %s on this paste-sexp" attr))
     (format "%s" a)))
-
-
-(cl-defun pastebin-do-login (&key username password dev-key)
-  "Interface layer, do the login and set `pastebin-default-user'"
-  (unless (and username password dev-key)
-    (error "pastebin-login argument missing"))
-  
-  (setq pastebin-default-user (paste-user username :username username
-                                          :password password
-                                          :dev-key dev-key))
-  (login pastebin-default-user))
 
 (defun strip-CRs (&optional buffer)
   "Get rid of damn ^Ms"
@@ -420,14 +332,23 @@ Operates on current buffer"
 (defun pastebin-delete-paste-at-point ()
   "Delete the paste at point"
   (interactive)
-  (let ((paste (pastebin-get-paste-at-point)))
-    (message "%s" (paste-delete paste))
-    (pastebin-list-buffer-refresh)))
+  (message "%s" (paste-delete (pastebin-get-paste-at-point)))
+  (pastebin-list-buffer-refresh))
 
 (defun pastebin-new ()
   "Create a new paste from buffer"
   (interactive)
   (message "URL %s" (paste-new pastebin-default-user)))
+
+(cl-defun pastebin-do-login (&key username password dev-key)
+  "Interface layer, do the login and set `pastebin-default-user'"
+  (unless (and username password dev-key)
+    (error "pastebin-login argument missing"))
+  
+  (setq pastebin-default-user (paste-user username :username username
+                                          :password password
+                                          :dev-key dev-key))
+  (login pastebin-default-user))
 
 (pastebin-do-login :dev-key pastebin-unique-developer-api-key
                    :password pastebin-password
