@@ -1,43 +1,63 @@
-;; 
-;; Pastebin.com interface to emacs
-;;
-;; Author: Daniel Hilst Selli danielhilst at gmail.com
-;;
-;;
-;; Naming convention:
-;;
-;; pastebin-- prefix for internal stuff
-;; pastebin- prefix for user interface and customs
-;;
-;;
-;; @TODO list:
-;;
-;; - On pasting a new paste:
-;;   - Set syntax based on mode
-;;   - Set privacy depending o command prefix
-;;   - Setting pastebin minor mode on the buffer pasted
-;;   - Check if paste was not block by containing an url
-;;
-;; - On fetching the paste
-;;   - Set the mode based on paste's syntax
-;;   - Set pastebin-minor-mode on it
-;;  
-;; - pastebin minor mode
-;;   - Must save files on pastebin with keybinds. I'm
-;;     wondering if setting pastebin.com as an abstract storage
-;;     is a good idea. If so, C-x C-s should save pastebin buffers
-;;     to pastebin.com without question. Elisp files manual chapter would help-me
-;;     to do that http://www.gnu.org/software/emacs/manual/html_node/elisp/Files.html#Files
-;;
-;; - login
-;;   - Should ask user for password at first time used. The password
-;;     should be saved in encrypted form, using tramp or something like that.
-;;
-;; - error checking
-;;   - Currently, no error from pastebin or http error is checked. I should
-;;     check all they!
-;;   - Here is another error while pastebin-new "URL Post limit, maximum pastes per 24h reached"
-;;   
+;;; pastebin.el --- pastebin.com interface to emacs
+
+;;; Copyright (C) 2013 by Daniel Hilst <danielhilst at gmail.com>
+
+;;; This program is free software; you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation; either version 2, or (at your option)
+;;; any later version.
+
+;;; This program is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License for more details.
+
+;;; You should have received a copy of the GNU General Public License
+;;; along with this program; see the file COPYING.  If not, write to the
+;;; Free Software Foundation, Inc.,   51 Franklin Street, Fifth Floor,
+;;; Boston, MA  02110-1301  USA
+
+;;; Besides being a new interface, some parts were borrowed from old
+;;; interface so I think is fair put the names here. 
+;;; Copyright (C) 2008 by Nic Ferrier <nic@ferrier.me.uk>
+;;; Copyright (C) 2010 by Ivan Korotkov <twee@tweedle-dee.org>
+;;; Copyright (C) 2012 by Filonenko Michael <filonenko.mikhail@gmail.com>
+
+;;;
+;;; Naming convention:
+;;;
+;;; pastebin-- prefix for internal stuff
+;;; pastebin- prefix for user interface and customs
+;;;
+;;;
+;;; @TODO list:
+;;;
+;;; - On pasting a new paste:
+;;;   - Set syntax based on mode
+;;;   - Set privacy depending o command prefix
+;;;   - Setting pastebin minor mode on the buffer pasted
+;;;   - Check if paste was not block by containing an url
+;;;
+;;; - On fetching the paste
+;;;   - Set the mode based on paste's syntax
+;;;   - Set pastebin-minor-mode on it
+;;;  
+;;; - pastebin minor mode
+;;;   - Must save files on pastebin with keybinds. I'm
+;;;     wondering if setting pastebin.com as an abstract storage
+;;;     is a good idea. If so, C-x C-s should save pastebin buffers
+;;;     to pastebin.com without question. Elisp files manual chapter would help-me
+;;;     to do that http://www.gnu.org/software/emacs/manual/html_node/elisp/Files.html#Files
+;;;
+;;; - login
+;;;   - Should ask user for password at first time used. The password
+;;;     should be saved in encrypted form, using tramp or something like that.
+;;;
+;;; - error checking
+;;;   - Currently, no error from pastebin or http error is checked. I should
+;;;     check all they!
+;;;   - Here is another error while pastebin-new "URL Post limit, maximum pastes per 24h reached"
+;;;   
 
 
 (require 'eieio)
