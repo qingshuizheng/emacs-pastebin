@@ -3,63 +3,6 @@
   :tag "Pastebin"
   :group 'tools)
 
-;; PASTE CLASS
-
-(defclass paste ()
-  ((key :initarg :key)
-   (date :initarg :date)
-   (title :initarg :title)
-   (size :initarg :size)
-   (expire_date :initarg :expire_date)
-   (private :initarg :private)
-   (format_long :initarg :format_long)
-   (format_short :initarg :format_short)
-   (url :initarg :url)
-   (buffer :initarg :buffer)
-   (last-fetched :initarg :last-fetched)
-   (user :initarg :user)
-   (hits :initarg :hits)))
-
-(defmethod assign-buffer ((p paste) buf)
-  "Assing if not already assigned"
-  (if (slot-boundp p :buffer)
-      (oref p :buffer)
-    (oset p :buffer buf)))
-
-(defmethod paste-fetch ((p paste) &optional dont-set-buffer)
-  "Fetch the raw content from paste and return buffer containing"
-  (let* ((url-request-method "GET")
-         (url-request-extra-headers '(("Content-Type" . "application/x-www-form-urlencoded"))))
-    (with-current-buffer (url-retrieve-synchronously (concat pastebin-raw-paste-url (oref p key)))
-      (strip-http-header)
-      (unless dont-set-buffer
-        (assign-buffer p (current-buffer)))
-      (setq pastebin-local-buffer-paste p) ;; buffer local
-      (current-buffer))))
-
-;; TODO
-(defmethod paste-delete ((p paste))
-  "Detele paste from pastebin.com"
-  (unless (and (slot-boundp p :user)
-               (slot-boundp p :key)
-               (slot-boundp (oref p :user) :dev-key) 
-               (slot-boundp (oref p :user) :usr-key))
-    (signal 'unbound-error "paste-delete called with ubound slot object"))
-
-  (let* ((params (concat "api_dev_key=" (oref (oref p :user) :dev-key)
-                         "&api_user_key=" (oref (oref p :user) :usr-key)
-                         "&api_paste_key=" (oref p :key)
-                         "&api_option=delete"))
-         (url-request-method "POST")
-         (url-request-extra-headers
-          '(("Content-Type" . "application/x-www-form-urlencoded")))
-         (url-request-data params))
-    (with-current-buffer (url-retrieve-synchronously pastebin-post-request-paste-url)
-      (strip-http-header)
-      (buffer-string))
-    ))
-
-
 
 ;; PASTE-USER class
 
@@ -75,44 +18,45 @@
 (defmethod is-logged ((user paste-user))
   (slot-boundp user :usr-key))
 
-(defmethod fetch-list-xml ((user paste-user) &optional count)
+(defmethod fetch-list-xml ((user paste-user))
   "Fetch the list of pastes as xml, and return that buffer"
   (let* ((params (concat "api_dev_key=" (oref user dev-key)
                          "&api_user_key=" (oref user usr-key)
-                         "&api_results_limits=" (format "%d" (or count 100))
-                         "&api_option=" "list"))
+                         "&api_results_limits=" (format "%d" pastebin-default-paste-list-limit)
+                         "&api_option=list")
+                         )
          (url-request-method "POST")
          (url-request-extra-headers '(("Content-Type" . "application/x-www-form-urlencoded")))
          (url-request-data params))
     (with-current-buffer (url-retrieve-synchronously pastebin-post-request-paste-url)
       (strip-http-header)
       (strip-CRs)
-      (goto-char (point-max))
+      (goto-char (point-min))
       (current-buffer)
       )))
 
-(defmethod refresh-paste-list ((user paste-user) &optional count)
+(defmethod refresh-paste-list ((user paste-user))
   "Set/Refresh paste-list attr to the list of paste objects retrieved from pastebin.com"
   (oset user :paste-list nil)
-  (with-current-buffer (fetch-list-xml user (or count pastebin-default-paste-list-limit))
+  (with-current-buffer (fetch-list-xml user)
     (goto-char (point-min))
-    (let ((i (point-min)))
+    (let ((i (point-min))
+          plist)
       (while (re-search-forward "</paste>" nil t)
-        (let ((paste-sexp (xml-parse-region i (point))))
+        (let ((paste-sexp (xml-parse-region i (point)))
+              p)
           (setq i (point))
-          (push (paste (concat "paste@" (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_key))
-                               :key (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_key)
-                               :date (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_date)
-                               :title (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_title)
-                               :size (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_size)
-                               :expire_date (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_expire_date)
-                               :private (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_private)
-                               :format_long (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_format_long)
-                               :format_short (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_format_short)
-                               :url (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_url)
-                               :last-fetched (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_last-fetched)
-                               :user user) (oref user :paste-list))
+          (condition-case err
+              (progn
+                (setq p (paste-sexp-to-paste paste-sexp))
+                (oset p :user user)
+                (oset p :last-fetched (float-time))
+                (setq plist (append plist (list p))))
+            (wrong-type-argument
+             (error "Error while creating paste object on `refresh-paste-list' %s" err)
+             (debug)))
           )
+        (oset user :paste-list plist)
         )
       )
     )
@@ -121,10 +65,8 @@
 (defmethod do-list-buffer ((user paste-user))
   "Create a buffer with a list of pastes and return it
 Some keybinds are setted"
-  (interactive)
-
   (unless (is-logged user)
-    (signal 'unlogged-user "do-list-buffer called with not logged user"))
+    (error "do-list-buffer called with unloged user"))
 
   (oset user :list-buffer 
         (get-buffer-create (format "*Pastebin %s List*" (oref user :username))))
@@ -213,17 +155,61 @@ Set the pastebin-minor-mode on current buffer"
       (buffer-string)))
   )
 
+
+
+;; PASTE CLASS
+
+(defclass paste ()
+  ((key :initarg :key)
+   (date :initarg :date)
+   (title :initarg :title)
+   (size :initarg :size)
+   (expire_date :initarg :expire_date)
+   (private :initarg :private)
+   (format_long :initarg :format_long)
+   (format_short :initarg :format_short)
+   (url :initarg :url)
+   (buffer :initarg :buffer)
+   (last-fetched :initarg :last-fetched)
+   (user :initarg :user :type paste-user)
+   (hits :initarg :hits)))
+
 (defmethod fetch-and-process ((p paste))
   "Fetch buffer a do needed processing before switching to it"
   (with-current-buffer (paste-fetch p)
     (switch-to-buffer (current-buffer))))
     
+(defmethod paste-fetch ((p paste) &optional dont-set-buffer)
+  "Fetch the raw content from paste and return buffer containing"
+  (let* ((url-request-method "GET")
+         (url-request-extra-headers '(("Content-Type" . "application/x-www-form-urlencoded"))))
+    (with-current-buffer (url-retrieve-synchronously (concat pastebin-raw-paste-url (oref p key)))
+      (strip-http-header)
+      (unless dont-set-buffer
+        (oset p :buffer (current-buffer)))
+      (setq pastebin-local-buffer-paste p) ;; buffer local
+      (current-buffer))))
 
+(defmethod paste-delete ((p paste))
+  "Detele paste from pastebin.com"
+  (unless (and (slot-boundp p :user)
+               (slot-boundp p :key)
+               (slot-boundp (oref p :user) :dev-key) 
+               (slot-boundp (oref p :user) :usr-key))
+    (error "paste-delete called with ubound slot object"))
 
-
-
-
-
+  (let* ((params (concat "api_dev_key=" (oref (oref p :user) :dev-key)
+                         "&api_user_key=" (oref (oref p :user) :usr-key)
+                         "&api_paste_key=" (oref p :key)
+                         "&api_option=delete"))
+         (url-request-method "POST")
+         (url-request-extra-headers
+          '(("Content-Type" . "application/x-www-form-urlencoded")))
+         (url-request-data params))
+    (with-current-buffer (url-retrieve-synchronously pastebin-post-request-paste-url)
+      (strip-http-header)
+      (buffer-string))
+    ))
 
 ;; Local variables and customs
 
@@ -355,8 +341,12 @@ Attributes are described here: http://pastebin.com/api#9
 `attr' is a symbol
 Ex: (pastebin-paste-get-attr (pastebin-pastes-nth 0) 'paste_tittle)"
   (unless (symbolp attr)
-    (signal 'wrong-type-argument ("`attr' should be a symbol")))
-  (car (last (assoc attr (nthcdr 2 (car paste-sexp))))))
+    (error "attr should be a symbol"))
+  (let ((a (car (last (assoc attr (nthcdr 2 (car paste-sexp)))))))
+    (unless a
+      (error "No attribute %s on this paste-sexp" attr))
+    (format "%s" a)))
+
 
 (cl-defun pastebin-do-login (&key username password dev-key)
   "Interface layer, do the login and set `pastebin-default-user'"
@@ -399,8 +389,26 @@ If no buffer is given current buffer is used"
   (let ((paste (pastebin-get-paste-at-point)))
     (fetch-and-process paste)))
 
-;; User interface 
+;; FIX ME
+(defun paste-sexp-to-paste (paste-sexp)
+  (unless (consp paste-sexp)
+    (error "paste-sexp-to-paste called without cons type"))
+  (condition-case err
+      (paste (concat "paste@" (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_key))
+             :key (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_key)
+             :date (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_date)
+             :title (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_title)
+             :size (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_size)
+             :expire_date (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_expire_date)
+             :private (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_private)
+             :format_long (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_format_long)
+             :format_short (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_format_short)
+             :url (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_url)
+             )
+    ((debug error)
+     (error "Cant construct paste from sexp %s\nError: %s" paste-sexp err))))
 
+;; User interface 
 
 (defun pastebin-list-buffer-refresh ()
   "Refresh the list buffer screen
@@ -425,10 +433,7 @@ Operates on current buffer"
                    :password pastebin-password
                    :username pastebin-user-name)
 
-
 (provide 'pastebin-2.0)
 
-
-
-;; (refresh-paste-list pastebin-default-user)
-;; (setq paste-sexp '((paste nil (paste_key nil A96vA23q) (paste_date nil 1384544651) (paste_title nil *scratch*) (paste_size nil 191) (paste_expire_date nil 0) (paste_private nil 1) (paste_format_long nil None) (paste_format_short nil text) (paste_url nil http://pastebin.com/A96vA23q) (paste_hits nil 0))))
+;; (let ((paste-sexp '((paste nil (paste_key nil mhEKvKGv) (paste_date nil 1384694857) (paste_title nil *scratch*) (paste_size nil 224) (paste_expire_date nil 0) (paste_private nil 1) (paste_format_long nil None) (paste_format_short nil text) (paste_url nil http://pastebin.com/mhEKvKGv) (paste_hits nil 0)))))
+;;   (paste-sexp-to-paste paste-sexp))
