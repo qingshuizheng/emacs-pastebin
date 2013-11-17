@@ -3,30 +3,111 @@
 ;;
 ;; Author: Daniel Hilst Selli danielhilst at gmail.com
 ;;
+;;
+;; Naming convention:
+;;
+;; pastebin-- prefix for internal stuff
+;; pastebin- prefix for user interface and customs
+;;
+;;
+;; @TODO list:
+;;
+;; - On pasting a new paste:
+;;   - Set syntax based on mode
+;;   - Set privacy depending o command prefix
+;;   - Setting pastebin minor mode on the buffer pasted
+;;   - Check if paste was not block by containing an url
+;;
+;; - On fetching the paste
+;;   - Set the mode based on paste's syntax
+;;   - Set pastebin-minor-mode on it
+;;  
+;; - pastebin minor mode
+;;   - Must save files on pastebin with keybinds. I'm
+;;     wondering if setting pastebin.com as an abstract storage
+;;     is a good idea. If so, C-x C-s should save pastebin buffers
+;;     to pastebin.com without question. Elisp files manual chapter would help-me
+;;     to do that http://www.gnu.org/software/emacs/manual/html_node/elisp/Files.html#Files
+;;
+;; - login
+;;   - Should ask user for password at first time used. The password
+;;     should be saved in encrypted form, using tramp or something like that.
+;;
+;; - error checking
+;;   - Currently, no error from pastebin or http error is checked. I should
+;;     check all they!
+;;   - Here is another error while pastebin-new "URL Post limit, maximum pastes per 24h reached"
+;;   
+
 
 (require 'eieio)
-(require 'cl)
 
 (defgroup pastebin nil
   "Pastebin -- pastebin.com client"
   :tag "Pastebin"
   :group 'tools)
 
+;; Customs 
+
+(defcustom pastebin-default-paste-list-limit 100
+  "The number of pastes to retrieve by default"
+  :type 'number
+  :group 'pastebin)
+
+(defcustom pastebin-post-request-login-url "http://pastebin.com/api/api_login.php"
+  "Login url"
+  :type 'string
+  :group 'pastebin)
+
+(defcustom pastebin-post-request-paste-url "http://pastebin.com/api/api_post.php"
+  "Paste url"
+  :type 'string
+  :group 'pastebin)
+
+;; Global variables
+
+(defvar pastebin--default-user nil
+  "The default user begin used")
+
+(defvar pastebin--local-buffer-paste nil
+  "Every pastebin buffer has a paste object associated with it")
+(make-variable-buffer-local 'pastebin--local-buffer-paste)
+
+(defvar pastebin--list-buffer-user nil
+  "Every pastebin list buffer has a user object associated with it")
+(make-variable-buffer-local 'pastebin--list-buffer-user)
+
+(defvar pastebin--list-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "d") 'pastebin-delete-paste-at-point) ;; TODO 
+    (define-key map (kbd "r") 'pastebin-list-buffer-refresh) ;; TODO refresh pastebin list buffer
+    map)
+  "Key map for pastebin list buffer")
+
+(defconst pastebin--raw-paste-url "http://pastebin.com/raw.php?i="
+  "Concatenate this with paste key to get the raw paste")
+
+;;
+;; EIEIO Layer
+;;
+
 ;; PASTE-USER class
 
-(defclass paste-user ()
+(defclass pastebin--paste-user ()
   ((dev-key :initarg :dev-key "Your developer key from http://pastebin.com/api")
    (usr-key :initarg :usr-key "Your user key, retrived from pastebin")
    (password :initarg :password "Your password, clear text honey!!")
    (username :initarg :username "Your username")
    (paste-list :initarg :paste-list "The list of pastes for this user")
    (buffer-hash :initarg :list-buffer "Done by do-list-buffer")
-  ))
+  )
+  "Class representing a pastebin.com user")
 
-(defmethod is-logged ((user paste-user))
+(defmethod is-logged ((user pastebin--paste-user))
+  "Return true if user is logged in"
   (slot-boundp user :usr-key))
 
-(defmethod fetch-list-xml ((user paste-user))
+(defmethod fetch-list-xml ((user pastebin--paste-user))
   "Fetch the list of pastes as xml, and return that buffer"
   (let* ((params (concat "api_dev_key=" (oref user dev-key)
                          "&api_user_key=" (oref user usr-key)
@@ -37,13 +118,13 @@
          (url-request-extra-headers '(("Content-Type" . "application/x-www-form-urlencoded")))
          (url-request-data params))
     (with-current-buffer (url-retrieve-synchronously pastebin-post-request-paste-url)
-      (strip-http-header)
-      (strip-CRs)
+      (pastebin--strip-http-header)
+      (pastebin--strip-CRs)
       (goto-char (point-min))
       (current-buffer)
       )))
 
-(defmethod refresh-paste-list ((user paste-user))
+(defmethod refresh-paste-list ((user pastebin--paste-user))
   "Set/Refresh paste-list attr to the list of paste objects retrieved from pastebin.com"
   (oset user :paste-list nil)
   (with-current-buffer (fetch-list-xml user)
@@ -56,7 +137,7 @@
           (setq i (point))
           (condition-case err
               (progn
-                (setq p (paste-sexp-to-paste paste-sexp))
+                (setq p (pastebin--sexp-to-paste paste-sexp))
                 (oset p :user user)
                 (oset p :last-fetched (float-time))
                 (setq plist (append plist (list p))))
@@ -70,7 +151,7 @@
     )
   )
 
-(defmethod do-list-buffer ((user paste-user))
+(defmethod do-list-buffer ((user pastebin--paste-user))
   "Create a buffer with a list of pastes and return it
 Some keybinds are setted"
   (unless (is-logged user)
@@ -88,16 +169,16 @@ Some keybinds are setted"
       (erase-buffer))
 
     (widget-minor-mode 1)
-    (use-local-map pastebin-list-map)
+    (use-local-map pastebin--list-map)
     
-    (setq pastebin-list-buffer-user user)
+    (setq pastebin--list-buffer-user user)
 
     (widget-insert (format "%5.5s | %-8.8s | %-32.32s | %-7.7s | %-30.30s\n"
                            "VIEW" "ID" "TITLE" "SYNTAX" "DATE"))
     (dolist (paste (oref user :paste-list))
       (widget-create 'link 
                      :notify (lambda (wid &rest ignore)
-                               (pastebin-fetch-paste-at-point))
+                               (pastebin--fetch-paste-at-point))
                      :paste paste
                      :follow-link t
                      :value (format "%4.4s | %-8.8s | %-32.32s | %-7.7s | %-20.20s"
@@ -119,8 +200,9 @@ Some keybinds are setted"
     )
   )
 
-(defmethod login ((user paste-user))
-  "Given user and password login and sets dev-key"
+;; @TODO Error checking for bad user/passwor/dev-key here
+(defmethod login ((user pastebin--paste-user))
+  "Given user and password login and sets usr-key"
   (if (slot-boundp user :usr-key)
       (oref user :usr-key)
     (let* ((params (concat "api_dev_key=" (oref user :dev-key)
@@ -131,14 +213,15 @@ Some keybinds are setted"
             '(("Content-Type" . "application/x-www-form-urlencoded")))
            (url-request-data params))
       (with-current-buffer (url-retrieve-synchronously pastebin-post-request-login-url)
-        (strip-http-header)
+        (pastebin--strip-http-header)
         (oset user :usr-key (buffer-substring-no-properties (point-min) (point-max)))))))
 
-(defmethod paste-new ((user paste-user) &optional &key title syntax private buffer)
-  "Upload a new paste to pastebin.com
-Retrieve the paste object from pastebin
-Refresh paste-list for user
-Set the pastebin-minor-mode on current buffer"
+;; @TODO: If I paste something containing an url, pastebin
+;; blocks the paste until I pass a captha. I need to check
+;; if paste was really pasted and if not tell the user that
+;; he needs pass the captcha
+(defmethod paste-new ((user pastebin--paste-user) &optional &key title syntax private buffer)
+  "Upload a new paste to pastebin.com"
   (let* ((ptitle (or title (buffer-name)))
          (pbuffer (or buffer (current-buffer)))
          (psyntax (or syntax "text"))
@@ -155,7 +238,7 @@ Set the pastebin-minor-mode on current buffer"
           '(("Content-Type" . "application/x-www-form-urlencoded")))
          (url-request-data params))
     (with-current-buffer (url-retrieve-synchronously pastebin-post-request-paste-url)
-      (strip-http-header)
+      (pastebin--strip-http-header)
       (buffer-string)))
   )
 
@@ -163,7 +246,7 @@ Set the pastebin-minor-mode on current buffer"
 
 ;; PASTE CLASS
 
-(defclass paste ()
+(defclass pastebin--paste ()
   ((key :initarg :key)
    (date :initarg :date)
    (title :initarg :title)
@@ -175,26 +258,29 @@ Set the pastebin-minor-mode on current buffer"
    (url :initarg :url)
    (buffer :initarg :buffer)
    (last-fetched :initarg :last-fetched)
-   (user :initarg :user :type paste-user)
-   (hits :initarg :hits)))
+   (user :initarg :user :type pastebin--paste-user)
+   (hits :initarg :hits))
+  "Class representing a paste from pastebin.com 
+The contents of paste are not stored. Instead the method
+`paste-fetch' fetch and retrieve the buffer with paste contents")
 
-(defmethod fetch-and-process ((p paste))
+(defmethod fetch-and-process ((p pastebin--paste))
   "Fetch buffer a do needed processing before switching to it"
   (with-current-buffer (paste-fetch p)
     (switch-to-buffer (current-buffer))))
     
-(defmethod paste-fetch ((p paste) &optional dont-set-buffer)
+(defmethod paste-fetch ((p pastebin--paste) &optional dont-set-buffer)
   "Fetch the raw content from paste and return buffer containing"
   (let* ((url-request-method "GET")
          (url-request-extra-headers '(("Content-Type" . "application/x-www-form-urlencoded"))))
-    (with-current-buffer (url-retrieve-synchronously (concat pastebin-raw-paste-url (oref p key)))
-      (strip-http-header)
+    (with-current-buffer (url-retrieve-synchronously (concat pastebin--raw-paste-url (oref p key)))
+      (pastebin--strip-http-header)
       (unless dont-set-buffer
         (oset p :buffer (current-buffer)))
-      (setq pastebin-local-buffer-paste p) ;; buffer local
+      (setq pastebin--local-buffer-paste p) ;; buffer local
       (current-buffer))))
 
-(defmethod paste-delete ((p paste))
+(defmethod paste-delete ((p pastebin--paste))
   "Detele paste from pastebin.com"
   (unless (and (slot-boundp p :user)
                (slot-boundp p :key)
@@ -211,58 +297,17 @@ Set the pastebin-minor-mode on current buffer"
           '(("Content-Type" . "application/x-www-form-urlencoded")))
          (url-request-data params))
     (with-current-buffer (url-retrieve-synchronously pastebin-post-request-paste-url)
-      (strip-http-header)
-      (buffer-string))
+      (pastebin--strip-http-header)
+      (buffer-string)) ;; Pastebin send somthing like paste xxx deleted
     ))
-
-;; Local variables and customs
-
-(defvar pastebin-default-paste-list-limit 100
-  "The number of pastes to retrieve by default")
-
-(defvar pastebin-default-user nil
-  "The default user begin used")
-
-(defvar pastebin-local-buffer-paste nil
-  "Every pastebin buffer has a paste object associated with it")
-(make-variable-buffer-local 'pastebin-local-buffer-paste)
-
-(defvar pastebin-list-buffer-user nil
-  "Every pastebin list buffer has a user object associated with it")
-(make-variable-buffer-local 'pastebin-list-buffer-user)
-
-(defconst pastebin-raw-paste-url "http://pastebin.com/raw.php?i="
-  "Concatenate this with paste key to get the raw paste")
-
-(defcustom pastebin-post-request-login-url "http://pastebin.com/api/api_login.php"
-  "Login url"
-  :type 'string
-  :group 'pastebin)
-
-(defcustom pastebin-post-request-paste-url "http://pastebin.com/api/api_post.php"
-  "Paste url"
-  :type 'string
-  :group 'pastebin)
-
-(defcustom pastebin-pastes-list nil
-  "The list of `paste' instances"
-  :type 'cons
-  :group 'pastebin)
-
-(defvar pastebin-list-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "d") 'pastebin-delete-paste-at-point) ;; TODO 
-    (define-key map (kbd "r") 'pastebin-list-buffer-refresh) ;; TODO refresh pastebin list buffer
-    map)
-  "Key map for pastebin list buffer")
 
 ;; Local functions and helpers
 
-(defun pastebin-paste-sexp-get-attr-h (paste-sexp attr)
-  "Return the attribute `attr' from `paste'
+(defun pastebin--sexp-get-attr-h (paste-sexp attr)
+  "Return the attribute `attr' from `paste-sexp'
 Attributes are described here: http://pastebin.com/api#9
-`attr' is a symbol
-Ex: (pastebin-paste-get-attr (pastebin-pastes-nth 0) 'paste_tittle)"
+`attr' must be a symbol
+Ex: (pastebin-paste-get-attr some-paste-sexp 'paste_tittle)"
   (unless (symbolp attr)
     (error "attr should be a symbol"))
   (let ((a (car (last (assoc attr (nthcdr 2 (car paste-sexp)))))))
@@ -270,8 +315,10 @@ Ex: (pastebin-paste-get-attr (pastebin-pastes-nth 0) 'paste_tittle)"
       (error "No attribute %s on this paste-sexp" attr))
     (format "%s" a)))
 
-(defun strip-CRs (&optional buffer)
-  "Get rid of damn ^Ms"
+(defun pastebin--strip-CRs (&optional buffer)
+  "Get rid of CRLF
+I need this for xml-parse-region reponse without getting
+a lot of spaces and CRLF on pastes sexps. See `pastebin--sexp-to-paste'"
   (let ((buffer (or buffer (current-buffer))))
     (with-current-buffer buffer
       (goto-char (point-min))
@@ -279,7 +326,7 @@ Ex: (pastebin-paste-get-attr (pastebin-pastes-nth 0) 'paste_tittle)"
         (replace-match ""))
       buffer)))
 
-(defun strip-http-header (&optional buffer)
+(defun pastebin--strip-http-header (&optional buffer)
   "Given a buffer with an HTTP response, remove the header and return the buffer
 If no buffer is given current buffer is used"
   (let ((buffer (or buffer (current-buffer))))
@@ -289,33 +336,34 @@ If no buffer is given current buffer is used"
     (kill-region (point-min) (point))
     buffer)))
 
-(defun pastebin-get-paste-at-point ()
+(defun pastebin--get-paste-at-point ()
   "Get the paste at point at current-buffer"
   (let ((wid (widget-at)))
     (if (not wid)
         (error "No paste at point")
       (widget-get wid :paste))))
 
-(defun pastebin-fetch-paste-at-point ()
+(defun pastebin--fetch-paste-at-point ()
   "Fetch and switch to paste at point"
-  (let ((paste (pastebin-get-paste-at-point)))
-    (fetch-and-process paste)))
+  (let ((p (pastebin--get-paste-at-point)))
+    (fetch-and-process p)))
 
-;; FIX ME
-(defun paste-sexp-to-paste (paste-sexp)
+(defun pastebin--sexp-to-paste (paste-sexp)
+  "Given and sexp returned from `xml-parse-region' on pastebin.com response, constructs and return a pastebin--paste object.
+See `fetch-list-xml' for more information"
   (unless (consp paste-sexp)
-    (error "paste-sexp-to-paste called without cons type"))
+    (error "pastebin--sexp-to-paste called without cons type"))
   (condition-case err
-      (paste (concat "paste@" (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_key))
-             :key (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_key)
-             :date (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_date)
-             :title (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_title)
-             :size (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_size)
-             :expire_date (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_expire_date)
-             :private (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_private)
-             :format_long (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_format_long)
-             :format_short (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_format_short)
-             :url (pastebin-paste-sexp-get-attr-h paste-sexp 'paste_url)
+      (pastebin--paste (concat "paste@" (pastebin--sexp-get-attr-h paste-sexp 'paste_key))
+             :key (pastebin--sexp-get-attr-h paste-sexp 'paste_key)
+             :date (pastebin--sexp-get-attr-h paste-sexp 'paste_date)
+             :title (pastebin--sexp-get-attr-h paste-sexp 'paste_title)
+             :size (pastebin--sexp-get-attr-h paste-sexp 'paste_size)
+             :expire_date (pastebin--sexp-get-attr-h paste-sexp 'paste_expire_date)
+             :private (pastebin--sexp-get-attr-h paste-sexp 'paste_private)
+             :format_long (pastebin--sexp-get-attr-h paste-sexp 'paste_format_long)
+             :format_short (pastebin--sexp-get-attr-h paste-sexp 'paste_format_short)
+             :url (pastebin--sexp-get-attr-h paste-sexp 'paste_url)
              )
     ((debug error)
      (error "Cant construct paste from sexp %s\nError: %s" paste-sexp err))))
@@ -326,35 +374,37 @@ If no buffer is given current buffer is used"
   "Refresh the list buffer screen
 Operates on current buffer"
   (interactive)
-  (switch-to-buffer (do-list-buffer pastebin-default-user)))
+  (switch-to-buffer (do-list-buffer pastebin--default-user)))
   
-;; FIXME, pastebin-list-buffer-refresh cracks here
 (defun pastebin-delete-paste-at-point ()
   "Delete the paste at point"
   (interactive)
-  (message "%s" (paste-delete (pastebin-get-paste-at-point)))
+  (message "%s" (paste-delete (pastebin--get-paste-at-point)))
   (pastebin-list-buffer-refresh))
 
 (defun pastebin-new ()
   "Create a new paste from buffer"
   (interactive)
-  (message "URL %s" (paste-new pastebin-default-user)))
+  (message "URL %s" (paste-new pastebin--default-user)))
 
-(cl-defun pastebin-do-login (&key username password dev-key)
-  "Interface layer, do the login and set `pastebin-default-user'"
+;; @TODO: I want this to be interactive and password to be prompted
+;; Other stuff can go as customs. Password should keep cached in
+;; encrypted form as tramp does.
+(defun* pastebin-do-login (&key username password dev-key)
+  "Interface layer, do the login and set `pastebin--default-user'"
   (unless (and username password dev-key)
     (error "pastebin-login argument missing"))
   
-  (setq pastebin-default-user (paste-user username :username username
+  (setq pastebin--default-user (pastebin--paste-user username :username username
                                           :password password
                                           :dev-key dev-key))
-  (login pastebin-default-user))
+  (login pastebin--default-user)
+  (message "User %s logged on pastebin.com! Have a nice day!" username))
 
+;; @TODO: REMOVE THIS!
 (pastebin-do-login :dev-key pastebin-unique-developer-api-key
                    :password pastebin-password
                    :username pastebin-user-name)
 
 (provide 'pastebin-2.0)
 
-;; (let ((paste-sexp '((paste nil (paste_key nil mhEKvKGv) (paste_date nil 1384694857) (paste_title nil *scratch*) (paste_size nil 224) (paste_expire_date nil 0) (paste_private nil 1) (paste_format_long nil None) (paste_format_short nil text) (paste_url nil http://pastebin.com/mhEKvKGv) (paste_hits nil 0)))))
-;;   (paste-sexp-to-paste paste-sexp))
