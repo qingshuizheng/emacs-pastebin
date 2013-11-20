@@ -90,11 +90,87 @@
 
 ;; Global variables
 
+(defvar pastebin--type-assoc
+  '((actionscript-mode . " actionscript")
+    (ada-mode . "ada")
+    (asm-mode . "asm")
+    (autoconf-mode . "bash")
+    (bibtex-mode . "bibtex")
+    (cmake-mode . "cmake")
+    (c-mode . "c")
+    (c++-mode . "cpp")
+    (cobol-mode . "cobol")
+    (conf-colon-mode . "properties")
+    (conf-javaprop-mode . "properties")
+    (conf-mode . "ini")
+    (conf-space-mode . "properties")
+    (conf-unix-mode . "ini")
+    (conf-windows-mode . "ini")
+    (cperl-mode . "perl")
+    (csharp-mode . "csharp")
+    (css-mode . "css")
+    (delphi-mode . "delphi")
+    (diff-mode . "dff")
+    (ebuild-mode . "bash")
+    (eiffel-mode . "eiffel")
+    (emacs-lisp-mode . "lisp")
+    (erlang-mode . "erlang")
+    (erlang-shell-mode . "erlang")
+    (espresso-mode . "javascript")
+    (fortran-mode . "fortran")
+    (glsl-mode . "glsl")
+    (gnuplot-mode . "gnuplot")
+    (graphviz-dot-mode . "dot")
+    (haskell-mode . "haskell")
+    (html-mode . "html4strict")
+    (idl-mode . "idl")
+    (inferior-haskell-mode . "haskell")
+    (inferior-octave-mode . "octave")
+    (inferior-python-mode . "python")
+    (inferior-ruby-mode . "ruby")
+    (java-mode . "java")
+    (js2-mode . "javascript")
+    (jython-mode . "python")
+    (latex-mode . "latex")
+    (lisp-mode . "lisp")
+    (lua-mode . "lua")
+    (makefile-mode . "make")
+    (makefile-automake-mode . "make")
+    (makefile-gmake-mode . "make")
+    (makefile-makepp-mode . "make")
+    (makefile-bsdmake-mode . "make")
+    (makefile-imake-mode . "make")
+    (matlab-mode . "matlab")
+    (nxml-mode . "xml")
+    (oberon-mode . "oberon2")
+    (objc-mode . "objc")
+    (ocaml-mode . "ocaml")
+    (octave-mode . "matlab")
+    (pascal-mode . "pascal")
+    (perl-mode . "perl")
+    (php-mode . "php")
+    (plsql-mode . "plsql")
+    (po-mode . "gettext")
+    (prolog-mode . "prolog")
+    (python-2-mode . "python")
+    (python-3-mode . "python")
+    (python-basic-mode . "python")
+    (python-mode . "python")
+    (ruby-mode . "ruby")
+    (scheme-mode . "lisp")
+    (shell-mode . "bash")
+    (sh-mode . "bash")
+    (smalltalk-mode . "smalltalk")
+    (sql-mode . "sql")
+    (tcl-mode . "tcl")
+    (visual-basic-mode . "vb")
+    (xml-mode . "xml")
+    (yaml-mode . "properties")
+    (text-mode . "text"))
+  "Alist composed of major-mode names and corresponding pastebin highlight formats.")
+
 (defvar pastebin--default-user nil
   "The default user begin used")
-
-(defvar pastebin--password-key "pastebin--pasword-key"
-  "The key used to cache password on password-cache.el")
 
 (defvar pastebin--local-buffer-paste nil
   "Every pastebin buffer has a paste object associated with it")
@@ -111,8 +187,6 @@
     map)
   "Key map for pastebin list buffer")
 
-
-
 (defconst pastebin--raw-paste-url "http://pastebin.com/raw.php?i="
   "Concatenate this with paste key to get the raw paste")
 
@@ -128,7 +202,7 @@
    (password :initarg :password "Your password, clear text honey!!")
    (username :initarg :username "Your username")
    (paste-list :initarg :paste-list "The list of pastes for this user")
-   (buffer-hash :initarg :list-buffer "Done by do-list-buffer")
+   (list-buffer :initarg :list-buffer "Done by do-list-buffer")
   )
   "Class representing a pastebin.com user")
 
@@ -293,19 +367,32 @@ Some keybinds are setted"
 The contents of paste are not stored. Instead the method
 `paste-fetch' fetch and retrieve the buffer with paste contents")
 
+(defmethod get-mode ((p pastebin--paste))
+  "return the mode from `pastebin--type-assoc'"
+  (if (slot-boundp p :format_short)
+      (car (rassoc (oref p :format_short) pastebin--type-assoc))
+    (error "No format short for paste %s with key %s" (oref p :title) (oref p :key))))
+
 (defmethod fetch-and-process ((p pastebin--paste))
   "Fetch buffer a do needed processing before switching to it"
   (with-current-buffer (paste-fetch p)
     (switch-to-buffer (current-buffer))))
     
-(defmethod paste-fetch ((p pastebin--paste) &optional dont-set-buffer)
+(defmethod paste-fetch ((p pastebin--paste))
   "Fetch the raw content from paste and return buffer containing"
   (let* ((url-request-method "GET")
-         (url-request-extra-headers '(("Content-Type" . "application/x-www-form-urlencoded"))))
-    (with-current-buffer (url-retrieve-synchronously (concat pastebin--raw-paste-url (oref p key)))
-      (pastebin--strip-http-header)
-      (unless dont-set-buffer
-        (oset p :buffer (current-buffer)))
+         (url-request-extra-headers '(("Content-Type" . "application/x-www-form-urlencoded")))
+         (content-buf (url-retrieve-synchronously (concat pastebin--raw-paste-url (oref p key))))
+         (inhibit-read-only t)
+         (pbuf (if (slot-boundp p :buffer)
+                   (oref p :buffer)
+                 (get-buffer-create (concat "*paste " (oref p :title ) "*")))))
+    (pastebin--strip-http-header content-buf)
+    (oset p :buffer pbuf)
+    (with-current-buffer pbuf
+      (erase-buffer)
+      (insert-buffer content-buf)
+      (funcall (get-mode p))
       (setq pastebin--local-buffer-paste p) ;; buffer local
       (current-buffer))))
 
