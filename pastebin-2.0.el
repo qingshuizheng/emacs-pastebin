@@ -49,16 +49,15 @@
 ;;;     to pastebin.com without question. Elisp files manual chapter would help-me
 ;;;     to do that http://www.gnu.org/software/emacs/manual/html_node/elisp/Files.html#Files
 ;;;
-;;; - login
-;;;   - Should ask user for password at first time used. The password
-;;;     should be saved in encrypted form, using tramp or something like that.
-;;;
 ;;; - error checking
 ;;;   - Currently, no error from pastebin or http error is checked. I should
 ;;;     check all they!
 ;;;   - Here is another error while pastebin-new "URL Post limit, maximum pastes per 24h reached"
+;;;
+;;; DEPENDENCIES
+;;;
+;;; eieio.el
 ;;;   
-
 
 (require 'eieio)
 
@@ -84,10 +83,18 @@
   :type 'string
   :group 'pastebin)
 
+(defcustom pastebin-data-dir "~/.emacs.d/pastebin-data"
+  "Diretory to keep data"
+  :type 'string
+  :group 'pastebin)
+
 ;; Global variables
 
 (defvar pastebin--default-user nil
   "The default user begin used")
+
+(defvar pastebin--password-key "pastebin--pasword-key"
+  "The key used to cache password on password-cache.el")
 
 (defvar pastebin--local-buffer-paste nil
   "Every pastebin buffer has a paste object associated with it")
@@ -103,6 +110,8 @@
     (define-key map (kbd "r") 'pastebin-list-buffer-refresh) ;; TODO refresh pastebin list buffer
     map)
   "Key map for pastebin list buffer")
+
+
 
 (defconst pastebin--raw-paste-url "http://pastebin.com/raw.php?i="
   "Concatenate this with paste key to get the raw paste")
@@ -388,6 +397,35 @@ See `fetch-list-xml' for more information"
     ((debug error)
      (error "Cant construct paste from sexp %s\nError: %s" paste-sexp err))))
 
+(defun pastebin--store-password (passwd)
+  "Stores password on `pastebin-data-dir'/pass"
+  (pastebin--mkdatadir)
+  (with-temp-buffer
+    (insert passwd)
+    (write-file (concat pastebin-data-dir "/pass"))))
+
+(defun pastebin--read-password-from-file ()
+  "Read password from `pastebin-data-dir'/pass"
+  (with-temp-buffer
+    (goto-char (point-min))
+    (insert-file-literally (concat pastebin-data-dir "/pass"))
+    (buffer-string)))
+
+(defun pastebin--password-file-exists-p ()
+  "return t if pastebin-data-dir exists"
+  (file-exists-p (concat pastebin-data-dir "/pass")))
+
+(defun pastebin--mkdatadir ()
+  "Create the `pastebin-data-dir'"
+  (ignore-errors
+    (make-directory pastebin-data-dir t)))
+
+(defun pastebin--ask-for-password (prompt)
+  (lexical-let ((p (read-passwd prompt)))
+    (when (yes-or-no-p "Store password on disk? ")
+        (pastebin--store-password p))
+    p))
+
 ;; User interface 
 
 (defun pastebin-list-buffer-refresh ()
@@ -407,23 +445,22 @@ Operates on current buffer"
   (interactive)
   (message "URL %s" (paste-new pastebin--default-user)))
 
-;; @TODO: I want this to be interactive and password to be prompted
-;; Other stuff can go as customs. Password should keep cached in
-;; encrypted form as tramp does.
-(defun* pastebin-do-login (&key username password dev-key)
+(defun* pastebin-do-login (&key username dev-key password)
   "Interface layer, do the login and set `pastebin--default-user'"
-  (unless (and username password dev-key)
-    (error "pastebin-login argument missing"))
-  
-  (setq pastebin--default-user (pastebin--paste-user username :username username
-                                          :password password
-                                          :dev-key dev-key))
+  (unless (and username dev-key)
+    (error "pastebin-login argument missing. (dev-key or username)"))
+  (lexical-let ((p (if (pastebin--password-file-exists-p)
+                       (pastebin--read-password-from-file)
+                     (pastebin--ask-for-password "Pastebin password: "))))
+    (setq pastebin--default-user (pastebin--paste-user username
+                                                     :username username
+                                                     :dev-key  dev-key
+                                                     :password p)))
   (login pastebin--default-user)
   (message "User %s logged on pastebin.com! Have a nice day!" username))
 
 ;; @TODO: REMOVE THIS!
 (pastebin-do-login :dev-key pastebin-unique-developer-api-key
-                   :password pastebin-password
                    :username pastebin-user-name)
 
 (provide 'pastebin-2.0)
