@@ -260,47 +260,53 @@ Some keybinds are setted"
   (unless (is-logged user)
     (error "do-list-buffer called with unloged user"))
 
-  (oset user :list-buffer 
-        (get-buffer-create (format "*Pastebin %s List*" (oref user :username))))
-  
+  (lexical-let ((user-buf (and (slot-boundp user :list-buffer)
+                               (get-buffer (oref user :list-buffer)))))
+    (unless user-buf
+      (oset user :list-buffer (generate-new-buffer (format "Pastebin %s pastes" (oref user :username))))
+      (with-current-buffer (oref user :list-buffer)
+        (goto-char (point-min)))))
+
   ;; fetch pastes list
   (refresh-paste-list user)
 
-  (with-current-buffer (get-buffer (oref user :list-buffer))
+  (let ((inhibit-read-only t)
+        old-point (point))
+    (with-current-buffer (get-buffer (oref user :list-buffer))
 
-    (let ((inhibit-read-only t))
-      (erase-buffer))
+      (erase-buffer)
 
-    (widget-minor-mode 1)
-    (use-local-map pastebin--list-map)
-    
-    (setq pastebin--list-buffer-user user)
+      (widget-minor-mode 1)
+      (use-local-map pastebin--list-map)
+      
+      (setq pastebin--list-buffer-user user)
 
-    (widget-insert (format "%5.5s | %-8.8s | %-32.32s | %-7.7s | %-30.30s\n"
-                           "VIEW" "ID" "TITLE" "SYNTAX" "DATE"))
-    (dolist (paste (oref user :paste-list))
-      (widget-create 'link 
-                     :notify (lambda (wid &rest ignore)
-                               (pastebin--fetch-paste-at-point))
-                     :paste paste
-                     :follow-link t
-                     :value (format "%4.4s | %-8.8s | %-32.32s | %-7.7s | %-20.20s"
-                                    (if (string= (oref paste :private) "1")
-                                        "PRIV"
-                                      "PUBL")
-                                    (oref paste :key)
-                                    (or (oref paste :title) "")
-                                    (oref paste :format_short)
-                                    (format-time-string "%c" (seconds-to-time (string-to-number (oref paste :date))))
-                                    )
-                     )
+      (widget-insert (format "%5.5s | %-8.8s | %-32.32s | %-7.7s | %-30.30s\n"
+                             "VIEW" "ID" "TITLE" "SYNTAX" "DATE"))
+      (dolist (paste (oref user :paste-list))
+        (widget-create 'link 
+                       :notify (lambda (wid &rest ignore)
+                                 (pastebin--fetch-paste-at-point))
+                       :paste paste
+                       :follow-link t
+                       :value (format "%4.4s | %-8.8s | %-32.32s | %-7.7s | %-20.20s"
+                                      (if (string= (oref paste :private) "1")
+                                          "PRIV"
+                                        "PUBL")
+                                      (oref paste :key)
+                                      (or (oref paste :title) "")
+                                      (oref paste :format_short)
+                                      (format-time-string "%c" (seconds-to-time (string-to-number (oref paste :date))))
+                                      )
+                       )
 
-      (widget-insert "\n")
-      )
-    (widget-setup)
-    (goto-char (point-min))
-    (current-buffer)
-    )
+        (widget-insert "\n")
+        )
+      (widget-setup)
+      (goto-char (or old-point (point-min)))
+      (current-buffer)
+      ) ;; (with-current-buffer (get-buffer (oref user :list-buffer))
+    ) ;; (let ((inhibit-read-only t)
   )
 
 ;; @TODO Error checking for bad user/passwor/dev-key here
@@ -519,7 +525,13 @@ See `fetch-list-xml' for more information"
   "Refresh the list buffer screen
 Operates on current buffer"
   (interactive)
-  (switch-to-buffer (do-list-buffer pastebin--default-user)))
+  (lexical-let ((old-point (point)))
+    (with-current-buffer (do-list-buffer pastebin--default-user)
+      (goto-char old-point)
+      (switch-to-buffer (current-buffer))
+      ) 
+    ) 
+  )
   
 (defun pastebin-delete-paste-at-point ()
   "Delete the paste at point"
