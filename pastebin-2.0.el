@@ -24,6 +24,114 @@
 ;;; Copyright (C) 2012 by Filonenko Michael <filonenko.mikhail@gmail.com>
 
 ;;;
+;;; USAGE:
+;;;
+;;;     LOGIN
+;;;     ~~~~~
+;;;
+;;; Puts this on your .emacs file
+;;;
+;;; ((pastebin-do-login :dev-key "YOUR DEV KEY"
+;;;                     :username "YOUR USER NAME")
+;;;
+;;;
+;;; -*- SECURITY DISCLAIMER -*-
+;;;
+;;; Password will be asked first time you login. It will also ask for store password
+;;; on disk. This will be saved on ~/.emacs.d/pastebin-data/pass by default.
+;;;
+;;; !!! YOUR PASSWORD ITS SAVED ON PLAIN TEXT  !!!
+;;;
+;;; Since pastebin uses http instead of https, your password can be gathered from sniffers
+;;; on network, so you are not safe in any case, this is pastebin.com api and is insecure.
+;;; Use at own risk!
+;;;
+;;; 
+;;;     LISTING
+;;;     ~~~~~~~
+;;;
+;;; M-x pastebin-list-buffer-refresh -> Fetch and list pastes on "list buffer"
+;;;
+;;; After logged you can list your pastes with command `pastebin-list-buffer-refresh', just
+;;; type pastebin-l and press TAB.
+;;;
+;;; Here is a list of keybinds from list buffer
+;;;
+;;; RET -> fetch paste and switch to it
+;;; r ->   refresh list and list buffer
+;;; d ->   delete paste
+;;; t ->   order by title
+;;; D ->   order by date
+;;; f ->   order by format
+;;; k ->   order by key
+;;; p ->   order by private
+;;;
+;;;
+;;;     CREATING NEW PASTE
+;;;     ~~~~~~~~~~~~~~~~~~
+;;;
+;;; M-x pastebin-new -> will create a new paste from current buffer
+;;;
+;;; The name of the paste is given from current buffer name
+;;; The format from buffers major mode
+;;; Prefix argument makes private @TODO
+;;;
+
+;;;
+;;; USAGE:
+;;;
+;;;     LOGIN
+;;;     ~~~~~
+;;;
+;;; Puts this on your .emacs file
+;;;
+;;; ((pastebin-do-login :dev-key "YOUR DEV KEY"
+;;;                     :username "YOUR USER NAME")
+;;;
+;;;
+;;; -*- SECURITY DISCLAIMER -*-
+;;;
+;;; Password will be asked first time you login. It will also ask for store password
+;;; on disk. This will be saved on ~/.emacs.d/pastebin-data/pass by default.
+;;;
+;;; !!! YOUR PASSWORD ITS SAVED ON PLAIN TEXT  !!!
+;;;
+;;; Since pastebin uses http instead of https, your password can be gathered from sniffers
+;;; on network, so you are not safe in any case, this is pastebin.com api and is insecure.
+;;; Use at own risk!
+;;;
+;;; 
+;;;     LISTING
+;;;     ~~~~~~~
+;;;
+;;; M-x pastebin-list-buffer-refresh -> Fetch and list pastes on "list buffer"
+;;;
+;;; After logged you can list your pastes with command `pastebin-list-buffer-refresh', just
+;;; type pastebin-l and press TAB.
+;;;
+;;; Here is a list of keybinds from list buffer
+;;;
+;;; RET -> fetch paste and switch to it
+;;; r ->   refresh list and list buffer
+;;; d ->   delete paste
+;;; t ->   order by title
+;;; D ->   order by date
+;;; f ->   order by format
+;;; k ->   order by key
+;;; p ->   order by private
+;;;
+;;;
+;;;     CREATING NEW PASTE
+;;;     ~~~~~~~~~~~~~~~~~~
+;;;
+;;; M-x pastebin-new -> will create a new paste from current buffer
+;;;
+;;; The name of the paste is given from current buffer name
+;;; The format from buffers major mode
+;;; Prefix argument makes private @TODO
+;;;
+
+;;;
 ;;; Naming convention:
 ;;;
 ;;; pastebin-- prefix for internal stuff
@@ -39,7 +147,6 @@
 ;;;   - Check if paste was not block by containing an url
 ;;;
 ;;; - On fetching the paste
-;;;   - Set the mode based on paste's syntax
 ;;;   - Set pastebin-minor-mode on it
 ;;;  
 ;;; - pastebin minor mode
@@ -54,7 +161,7 @@
 ;;;     check all they!
 ;;;   - Here is another error while pastebin-new "URL Post limit, maximum pastes per 24h reached"
 ;;;
-;;; DEPENDENCIES
+;;; DEPENDENCIES:
 ;;;
 ;;; eieio.el
 ;;;   
