@@ -31,8 +31,11 @@
 ;;;
 ;;; Puts this on your .emacs file
 ;;;
-;;; ((pastebin-do-login :dev-key "YOUR DEV KEY"
-;;;                     :username "YOUR USER NAME")
+;;; (pastebin-do-login :dev-key "YOUR DEV KEY"
+;;;                    :username "YOUR USER NAME")
+;;;
+;;; You can get your :dev-key from http://pastebin.com/api#1
+;;; is an hex string with something like your user hash
 ;;;
 ;;;
 ;;; -*- SECURITY DISCLAIMER -*-
@@ -707,7 +710,6 @@ Operates on current buffer"
   (interactive "P")
   (message "URL %s" (paste-new pastebin--default-user p ;; private 
                                )))
-
 (defun* pastebin-do-login (&key username dev-key password)
   "Interface layer, do the login and set `pastebin--default-user'"
   (unless (and username dev-key)
@@ -722,12 +724,7 @@ Operates on current buffer"
   (login pastebin--default-user)
   (message "User %s logged on pastebin.com! Have a nice day!" username))
 
-;; @TODO: REMOVE THIS!
-(pastebin-do-login :dev-key pastebin-unique-developer-api-key
-                   :username pastebin-user-name)
-
-
-
-
 (provide 'pastebin-2.0)
+
+;;; END of pastebin-2.0
 
