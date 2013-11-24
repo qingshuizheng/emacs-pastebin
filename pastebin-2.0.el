@@ -260,19 +260,15 @@ Some keybinds are setted"
   (unless (is-logged user)
     (error "do-list-buffer called with unloged user"))
 
-  (lexical-let ((user-buf (and (slot-boundp user :list-buffer)
-                               (get-buffer (oref user :list-buffer)))))
-    (unless user-buf
-      (oset user :list-buffer (generate-new-buffer (format "Pastebin %s pastes" (oref user :username))))
-      (with-current-buffer (oref user :list-buffer)
-        (goto-char (point-min)))))
+  (unless (slot-boundp user :list-buffer)
+    (oset user :list-buffer (format "Pastebin %s pastes" (oref user :username))))
 
   ;; fetch pastes list
   (refresh-paste-list user)
 
   (let ((inhibit-read-only t)
         old-point (point))
-    (with-current-buffer (get-buffer (oref user :list-buffer))
+    (with-current-buffer (get-buffer-create (oref user :list-buffer))
 
       (erase-buffer)
 
