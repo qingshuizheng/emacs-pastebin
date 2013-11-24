@@ -254,6 +254,18 @@
     )
   )
 
+(defmacro sort-by-string-attr (user attr)
+  "sort :paste-list by `attr'"
+  `(oset ,user :paste-list (sort (oref ,user :paste-list) (lambda (p1 p2)
+                                                          (string< (oref p1 ,attr)
+                                                                   (oref p2 ,attr))))))
+
+(defmacro sort-by-string-attr-rev (user attr)
+  "sort :paste-list by `attr' in reverse order"
+  `(oset ,user :paste-list (sort (oref ,user :paste-list) (lambda (p1 p2)
+                                                          (string< (oref p2 ,attr)
+                                                                   (oref p1 ,attr))))))
+
 (defmethod do-list-buffer ((user pastebin--paste-user))
   "Create a buffer with a list of pastes and return it
 Some keybinds are setted"
@@ -557,6 +569,9 @@ Operates on current buffer"
 ;; @TODO: REMOVE THIS!
 (pastebin-do-login :dev-key pastebin-unique-developer-api-key
                    :username pastebin-user-name)
+
+
+
 
 (provide 'pastebin-2.0)
 
