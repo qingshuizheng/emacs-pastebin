@@ -184,6 +184,11 @@
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "d") 'pastebin-delete-paste-at-point) ;; TODO 
     (define-key map (kbd "r") 'pastebin-list-buffer-refresh) ;; TODO refresh pastebin list buffer
+    (define-key map (kbd "f") 'pastebin-list-buffer-refresh-sort-by-format)
+    (define-key map (kbd "t") 'pastebin-list-buffer-refresh-sort-by-title)
+    (define-key map (kbd "k") 'pastebin-list-buffer-refresh-sort-by-key)
+    (define-key map (kbd "D") 'pastebin-list-buffer-refresh-sort-by-date)
+    (define-key map (kbd "p") 'pastebin-list-buffer-refresh-sort-by-private)
     map)
   "Key map for pastebin list buffer")
 
@@ -203,6 +208,7 @@
    (username :initarg :username "Your username")
    (paste-list :initarg :paste-list "The list of pastes for this user")
    (list-buffer :initarg :list-buffer "Done by do-list-buffer")
+   (sort-by :initarg :sort-by "Order to sort :paste-list")
   )
   "Class representing a pastebin.com user")
 
@@ -254,17 +260,20 @@
     )
   )
 
-(defmacro sort-by-string-attr (user attr)
-  "sort :paste-list by `attr'"
-  `(oset ,user :paste-list (sort (oref ,user :paste-list) (lambda (p1 p2)
-                                                          (string< (oref p1 ,attr)
-                                                                   (oref p2 ,attr))))))
-
-(defmacro sort-by-string-attr-rev (user attr)
+(defmacro pastebin--sort-by-string-attr (user attr)
   "sort :paste-list by `attr' in reverse order"
-  `(oset ,user :paste-list (sort (oref ,user :paste-list) (lambda (p1 p2)
-                                                          (string< (oref p2 ,attr)
-                                                                   (oref p1 ,attr))))))
+  `(progn
+     (unless (keywordp ,attr)
+       (error "pastebin--sort-by-stirng-attr attr is not a keyword"))
+
+     (unless (member ,attr '(:key :title :format_long :format_short :url :date :private))
+      (error "pastebin--sort-by-string-attr attr is not in '(:key :title :format_long :format_short :url)"))
+
+     (oset ,user :paste-list (sort (oref ,user :paste-list) (lambda (p1 p2)
+                                                          (string< (downcase (oref p1 ,attr))
+                                                                   (downcase (oref p2 ,attr))))))
+     )
+  )
 
 (defmethod do-list-buffer ((user pastebin--paste-user))
   "Create a buffer with a list of pastes and return it
@@ -274,9 +283,6 @@ Some keybinds are setted"
 
   (unless (slot-boundp user :list-buffer)
     (oset user :list-buffer (format "Pastebin %s pastes" (oref user :username))))
-
-  ;; fetch pastes list
-  (refresh-paste-list user)
 
   (let ((inhibit-read-only t)
         old-point (point))
@@ -290,7 +296,7 @@ Some keybinds are setted"
       (setq pastebin--list-buffer-user user)
 
       (widget-insert (format "%5.5s | %-8.8s | %-32.32s | %-7.7s | %-30.30s\n"
-                             "VIEW" "ID" "TITLE" "SYNTAX" "DATE"))
+                             "VIEW" "ID" "TITLE" "FORMAT" "DATE"))
       (dolist (paste (oref user :paste-list))
         (widget-create 'link 
                        :notify (lambda (wid &rest ignore)
@@ -533,19 +539,51 @@ See `fetch-list-xml' for more information"
   "Refresh the list buffer screen
 Operates on current buffer"
   (interactive)
-  (lexical-let ((old-point (point)))
-    (with-current-buffer (do-list-buffer pastebin--default-user)
-      (goto-char old-point)
-      (switch-to-buffer (current-buffer))
-      ) 
-    ) 
+  (refresh-paste-list pastebin--default-user)
+  (switch-to-buffer (do-list-buffer pastebin--default-user))
   )
-  
+
+
+(defun pastebin-list-buffer-refresh-sort-by-title ()
+  (interactive)
+  (pastebin--sort-by-string-attr pastebin--default-user :title)
+  (switch-to-buffer (do-list-buffer pastebin--default-user))
+  )
+
+(defun pastebin-list-buffer-refresh-sort-by-format ()
+  (interactive)
+  (pastebin--sort-by-string-attr pastebin--default-user :format_short)
+  (switch-to-buffer (do-list-buffer pastebin--default-user))
+  )
+
+(defun pastebin-list-buffer-refresh-sort-by-key ()
+  (interactive)
+  (pastebin--sort-by-string-attr pastebin--default-user :key)
+  (switch-to-buffer (do-list-buffer pastebin--default-user))
+  )
+
+(defun pastebin-list-buffer-refresh-sort-by-date ()
+  (interactive)
+  (pastebin--sort-by-string-attr pastebin--default-user :date)
+  (oset pastebin--default-user :paste-list (reverse (oref pastebin--default-user :paste-list)))
+  (switch-to-buffer (do-list-buffer pastebin--default-user))
+  )
+
+(defun pastebin-list-buffer-refresh-sort-by-private ()
+  (interactive)
+  (pastebin--sort-by-string-attr pastebin--default-user :private)
+  (switch-to-buffer (do-list-buffer pastebin--default-user))
+  )
+
 (defun pastebin-delete-paste-at-point ()
   "Delete the paste at point"
   (interactive)
-  (message "%s" (paste-delete (pastebin--get-paste-at-point)))
-  (pastebin-list-buffer-refresh))
+  (lexical-let ((p (pastebin--get-paste-at-point)))
+    (when (y-or-n-p (format "Do you really want to delete paste %s from %s\n" 
+                            (oref p :title)
+                            (format-time-string "%c" (seconds-to-time (string-to-number (oref p :date))))))
+      (message "%s" (paste-delete (pastebin--get-paste-at-point))))
+    (pastebin-list-buffer-refresh)))
 
 (defun pastebin-new ()
   "Create a new paste from buffer"
