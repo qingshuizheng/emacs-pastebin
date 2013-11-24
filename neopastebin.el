@@ -422,9 +422,15 @@ Some keybinds are setted"
                        :paste paste
                        :follow-link t
                        :value (format "%4.4s | %-8.8s | %-32.32s | %-7.7s | %-20.20s"
-                                      (if (string= (oref paste :private) "1")
-                                          "PRIV"
+                                      (cond 
+                                       ((string= (oref paste :private) "0")
                                         "PUBL")
+                                       ((string= (oref paste :private) "1")
+                                        "ULST")
+                                       ((string= (oref paste :private) "2")
+                                        "PRIV")
+                                       (t
+                                        "_ERR"))
                                       (oref paste :key)
                                       (or (oref paste :title) "")
                                       (oref paste :format_short)
@@ -475,7 +481,8 @@ Some keybinds are setted"
          (pprivate (or private "0"))
          (params (concat "api_dev_key=" (oref user :dev-key)
                          "&api_user_key=" (oref user :usr-key)
-                         "&api_paste_name=" ptitle
+                         "&api_paste_name=" (url-hexify-string ptitle)
+                         "&api_paste_format=" (url-hexify-string (pastebin--get-format-string-from-major-mode))
                          "&api_paste_code=" (url-hexify-string (with-current-buffer pbuffer
                                                                  (buffer-string)))
                          "&api_option=paste"
@@ -567,8 +574,6 @@ Error if major-mode is nil"
     (error "pastebin--get-format-string-from-major-mode called with nil major-mode"))
   (or (cdr (assoc major-mode pastebin--type-assoc))
       "text"))
-
-
 
 (defun pastebin--sexp-get-attr-h (paste-sexp attr)
   "Return the attribute `attr' from `paste-sexp'
