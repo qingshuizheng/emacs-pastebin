@@ -284,9 +284,15 @@ Some keybinds are setted"
   (unless (slot-boundp user :list-buffer)
     (oset user :list-buffer (format "Pastebin %s pastes" (oref user :username))))
 
+  (unless (get-buffer (oref user :list-buffer))
+    (generate-new-buffer (oref user :list-buffer))
+    (message "%s buffer created" (oref user :list-buffer)))
+
   (let ((inhibit-read-only t)
-        old-point (point))
-    (with-current-buffer (get-buffer-create (oref user :list-buffer))
+        old-point)
+    (with-current-buffer (get-buffer (oref user :list-buffer))
+
+      (setq old-point (point))
 
       (erase-buffer)
 
