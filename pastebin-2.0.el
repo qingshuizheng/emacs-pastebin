@@ -705,7 +705,8 @@ Operates on current buffer"
 (defun pastebin-new (p)
   "Create a new paste from buffer"
   (interactive "P")
-  (message "URL %s" (paste-new pastebin--default-user)))
+  (message "URL %s" (paste-new pastebin--default-user p ;; private 
+                               )))
 
 (defun* pastebin-do-login (&key username dev-key password)
   "Interface layer, do the login and set `pastebin--default-user'"
