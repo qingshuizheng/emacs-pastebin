@@ -456,7 +456,13 @@ Some keybinds are setted"
 ;; blocks the paste until I pass a captha. I need to check
 ;; if paste was really pasted and if not tell the user that
 ;; he needs pass the captcha
-(defmethod paste-new ((user pastebin--paste-user) &optional &key title syntax private buffer)
+;;
+;; @TODO: I cant have keyword arguments here!?
+;; currently (1ea7df3) title syntax and buffer
+;; are not rightly handled
+;; How can I let user pass title syntax or buffer?
+;; Are all that arguments needed?
+(defmethod paste-new ((user pastebin--paste-user) &optional private title syntax buffer)
   "Upload a new paste to pastebin.com"
   (let* ((ptitle (or title (buffer-name)))
          (pbuffer (or buffer (current-buffer)))
@@ -477,8 +483,6 @@ Some keybinds are setted"
       (pastebin--strip-http-header)
       (buffer-string)))
   )
-
-
 
 ;; PASTE CLASS
 
@@ -698,9 +702,9 @@ Operates on current buffer"
       (message "%s" (paste-delete (pastebin--get-paste-at-point))))
     (pastebin-list-buffer-refresh)))
 
-(defun pastebin-new ()
+(defun pastebin-new (p)
   "Create a new paste from buffer"
-  (interactive)
+  (interactive "P")
   (message "URL %s" (paste-new pastebin--default-user)))
 
 (defun* pastebin-do-login (&key username dev-key password)
