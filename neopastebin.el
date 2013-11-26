@@ -675,6 +675,8 @@ See `fetch-list-xml' for more information"
   "Refresh the list buffer screen
 Operates on current buffer"
   (interactive)
+  (unless (is-logged pastebin--default-user)
+    (login pastebin--default-user))
   (refresh-paste-list pastebin--default-user)
   (switch-to-buffer (do-list-buffer pastebin--default-user))
   )
@@ -724,8 +726,12 @@ Operates on current buffer"
 (defun pastebin-new (p)
   "Create a new paste from buffer"
   (interactive "P")
-  (message "URL %s" (paste-new pastebin--default-user p ;; private 
-                               )))
+  (unless (is-logged pastebin--default-user)
+    (login pastebin--default-user))
+  (message "URL %s" (paste-new pastebin--default-user (and p "1"))))
+
+
+
 (defun* pastebin-do-login (&key username dev-key password)
   "Interface layer, do the login and set `pastebin--default-user'"
   (unless (and username dev-key)
@@ -737,8 +743,7 @@ Operates on current buffer"
                                                      :username username
                                                      :dev-key  dev-key
                                                      :password p)))
-  (login pastebin--default-user)
-  (message "User %s logged on pastebin.com! Have a nice day!" username))
+  (message "User %s created, login is on demand. Have a nice day!" username))
 
 (provide 'neopastebin)
 
