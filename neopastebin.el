@@ -31,8 +31,12 @@
 ;;;
 ;;; Puts this on your .emacs file
 ;;;
-;;; ((pastebin-do-login :dev-key "YOUR DEV KEY"
+;;; ((pastebin-create-login :dev-key "YOUR DEV KEY"
 ;;;                     :username "YOUR USER NAME")
+;;;
+;;; Login will only ocurr when you try to paste something or
+;;; list your pastes. So is save to put this on your .emacs file
+;;; without need to wait emacs connect to pastebin on each startup.
 ;;;
 ;;;
 ;;; -*- SECURITY DISCLAIMER -*-
@@ -74,7 +78,7 @@
 ;;;
 ;;; The name of the paste is given from current buffer name
 ;;; The format from buffers major mode
-;;; Prefix argument makes private @TODO
+;;; Prefix argument makes private 
 ;;;
 
 ;;;
@@ -87,8 +91,6 @@
 ;;; @TODO list:
 ;;;
 ;;; - On pasting a new paste:
-;;;   - Set syntax based on mode
-;;;   - Set privacy depending o command prefix
 ;;;   - Setting pastebin minor mode on the buffer pasted
 ;;;   - Check if paste was not block by containing an url
 ;;;
@@ -675,7 +677,7 @@ Operates on current buffer"
 
 
 
-(defun* pastebin-do-login (&key username dev-key password)
+(defun* pastebin-create-login (&key username dev-key password)
   "Interface layer, do the login and set `pastebin--default-user'"
   (unless (and username dev-key)
     (error "pastebin-login argument missing. (dev-key or username)"))
