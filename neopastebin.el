@@ -92,7 +92,6 @@
 ;;;
 ;;; - On pasting a new paste:
 ;;;   - Setting pastebin minor mode on the buffer pasted
-;;;   - Check if paste was not block by containing an url
 ;;;
 ;;; - On fetching the paste
 ;;;   - Set pastebin-minor-mode on it
@@ -103,11 +102,6 @@
 ;;;     is a good idea. If so, C-x C-s should save pastebin buffers
 ;;;     to pastebin.com without question. Elisp files manual chapter would help-me
 ;;;     to do that http://www.gnu.org/software/emacs/manual/html_node/elisp/Files.html#Files
-;;;
-;;; - error checking
-;;;   - Currently, no error from pastebin or http error is checked. I should
-;;;     check all they!
-;;;   - Here is another error while pastebin-new "URL Post limit, maximum pastes per 24h reached"
 ;;;
 ;;; DEPENDENCIES:
 ;;;
@@ -389,7 +383,6 @@ Some keybinds are setted"
     ) ;; (let ((inhibit-read-only t)
   )
 
-;; @TODO Error checking for bad user/passwor/dev-key here
 (defmethod login ((user pastebin--paste-user))
   "Given user and password login and sets usr-key"
   (if (slot-boundp user :usr-key)
@@ -403,11 +396,6 @@ Some keybinds are setted"
                                                                  :params params)
         (oset user :usr-key (buffer-substring-no-properties (point-min) (point-max)))))))
 
-;; @TODO: If I paste something containing an url, pastebin
-;; blocks the paste until I pass a captha. I need to check
-;; if paste was really pasted and if not tell the user that
-;; he needs pass the captcha
-;;
 ;; @TODO: I cant have keyword arguments here!?
 ;; currently (1ea7df3) title syntax and buffer
 ;; are not rightly handled
