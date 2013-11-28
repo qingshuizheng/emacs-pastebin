@@ -429,8 +429,9 @@ Some keybinds are setted"
                          "&api_paste_private=" pprivate)))
     (with-current-buffer (pastebin--url-retrieve-synchronously :url pastebin-post-request-paste-url
                                                                :method "POST"
-                                                               :params params))
-      (buffer-string)))
+                                                               :params params)
+      (buffer-string))))
+
 
 
 ;; PASTE CLASS
@@ -620,7 +621,7 @@ See `fetch-list-xml' for more information"
           '(("Content-Type" . "application/x-www-form-urlencoded")))
          (url-request-data params)
          (content-buf (url-retrieve-synchronously url)))
-    (unless (pastebin--http-200-p content-buf)
+    (unless (pastebin--http-200-p content-buf) ;; check HTTP header
       (when debug-on-error
         (with-current-buffer (get-buffer-create "*pastebin-debug*")
           (erase-buffer)
@@ -631,12 +632,14 @@ See `fetch-list-xml' for more information"
               "pastebin--url-retrieve-synchronously HTTP Bad response (not 200) on header\n"
               (if debug-on-error
                   "See header at *pastebin-debug*"
-                ""))))
-    (with-current-buffer content-buf
+                "")))) ;; header is OK ...
+    (with-current-buffer content-buf   
+      (goto-char (point-min))
       (pastebin--strip-http-header)
-      (pastebin--error-if-bad-response (current-buffer)) ;; two `with-current-buffer' on same buffer :-/ slow?
-    content-buf
-    )))
+      (pastebin--error-if-bad-response (current-buffer)) ;; two `with-current-buffer' on same buffer :-/ slow
+      )
+    content-buf ;; return the buffer
+    ))
 
 (defun pastebin--error-if-bad-response (buf)
   "Raises a error if is a bad response from pastebin"
