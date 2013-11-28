@@ -278,13 +278,10 @@
   (let* ((params (concat "api_dev_key=" (oref user dev-key)
                          "&api_user_key=" (oref user usr-key)
                          "&api_results_limits=" (format "%d" pastebin-default-paste-list-limit)
-                         "&api_option=list")
-                         )
-         (url-request-method "POST")
-         (url-request-extra-headers '(("Content-Type" . "application/x-www-form-urlencoded")))
-         (url-request-data params))
-    (with-current-buffer (url-retrieve-synchronously pastebin-post-request-paste-url)
-      (pastebin--strip-http-header)
+                         "&api_option=list")))
+    (with-current-buffer (pastebin--url-retrieve-synchronously :url pastebin-post-request-paste-url
+                                                               :method "POST"
+                                                               :params params)
       (pastebin--strip-CRs)
       (goto-char (point-min))
       (current-buffer)
@@ -399,13 +396,11 @@ Some keybinds are setted"
       (oref user :usr-key)
     (let* ((params (concat "api_dev_key=" (oref user :dev-key)
                            "&api_user_name=" (url-hexify-string (oref user :username))
-                           "&api_user_password=" (url-hexify-string (oref user :password))))
-           (url-request-method "POST")
-           (url-request-extra-headers
-            '(("Content-Type" . "application/x-www-form-urlencoded")))
-           (url-request-data params))
-      (with-current-buffer (url-retrieve-synchronously pastebin-post-request-login-url)
-        (pastebin--strip-http-header)
+                           "&api_user_password=" (url-hexify-string (oref user :password)))))
+
+      (with-current-buffer (pastebin--url-retrieve-synchronously :url pastebin-post-request-login-url
+                                                                 :method "POST"
+                                                                 :params params)
         (oset user :usr-key (buffer-substring-no-properties (point-min) (point-max)))))))
 
 ;; @TODO: If I paste something containing an url, pastebin
@@ -431,15 +426,12 @@ Some keybinds are setted"
                          "&api_paste_code=" (url-hexify-string (with-current-buffer pbuffer
                                                                  (buffer-string)))
                          "&api_option=paste"
-                         "&api_paste_private=" pprivate))
-         (url-request-method "POST")
-         (url-request-extra-headers
-          '(("Content-Type" . "application/x-www-form-urlencoded")))
-         (url-request-data params))
-    (with-current-buffer (url-retrieve-synchronously pastebin-post-request-paste-url)
-      (pastebin--strip-http-header)
+                         "&api_paste_private=" pprivate)))
+    (with-current-buffer (pastebin--url-retrieve-synchronously :url pastebin-post-request-paste-url
+                                                               :method "POST"
+                                                               :params params))
       (buffer-string)))
-  )
+
 
 ;; PASTE CLASS
 
@@ -474,14 +466,13 @@ The contents of paste are not stored. Instead the method
 
 (defmethod paste-fetch ((p pastebin--paste))
   "Fetch the raw content from paste and return buffer containing"
-  (let* ((url-request-method "GET")
-         (url-request-extra-headers '(("Content-Type" . "application/x-www-form-urlencoded")))
-         (content-buf (url-retrieve-synchronously (concat pastebin--raw-paste-url (oref p key))))
+  (let* ((content-buf (pastebin--url-retrieve-synchronously :url (concat pastebin--raw-paste-url (oref p key))
+                                                            :method "GET"
+                                                            :params ""))
          (inhibit-read-only t)
          (pbuf (if (slot-boundp p :buffer)
                    (oref p :buffer)
                  (oset p :buffer (get-buffer-create (concat "*paste " (oref p :title ) "*"))))))
-    (pastebin--strip-http-header content-buf)
     (with-current-buffer pbuf
       (erase-buffer)
       (insert-buffer content-buf)
@@ -500,13 +491,10 @@ The contents of paste are not stored. Instead the method
   (let* ((params (concat "api_dev_key=" (oref (oref p :user) :dev-key)
                          "&api_user_key=" (oref (oref p :user) :usr-key)
                          "&api_paste_key=" (oref p :key)
-                         "&api_option=delete"))
-         (url-request-method "POST")
-         (url-request-extra-headers
-          '(("Content-Type" . "application/x-www-form-urlencoded")))
-         (url-request-data params))
-    (with-current-buffer (url-retrieve-synchronously pastebin-post-request-paste-url)
-      (pastebin--strip-http-header)
+                         "&api_option=delete")))
+    (with-current-buffer (pastebin--url-retrieve-synchronously :url pastebin-post-request-paste-url
+                                                               :method "POST"
+                                                               :params params)
       (buffer-string)) ;; Pastebin send somthing like paste xxx deleted
     ))
 
