@@ -741,13 +741,14 @@ Operates on current buffer"
   (unless (is-logged pastebin--default-user)
     (login pastebin--default-user))
   (save-excursion
+    (goto-char (point-min))
     (lexical-let* ((pbuf (paste-new pastebin--default-user (and p "1")))
                    (url (pastebin--get-pst-url pbuf))
                    (link-point (re-search-forward "http://[A-Za-z0-9_-]+\.[A-Za-z0-9]+" nil t)))
       (message "URL: %s%s" url
                (if link-point
                    (concat (format "\nYour buffer contains an link at line %d\n" (line-number-at-pos link-point))
-                           (format "please visit http://pastebin.com and fill the captcha"))
+                           (format "please visit link above and fill the captcha"))
                  "")))))
 
 (defun* pastebin-create-login (&key username dev-key password)
