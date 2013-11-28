@@ -614,6 +614,72 @@ See `fetch-list-xml' for more information"
         (pastebin--store-password p))
     p))
 
+(defun* pastebin--url-retrieve-synchronously (&key url method params)
+  (unless (stringp url)
+    (error "pastebin--url-retrieve-synchronously `url' need to be a string"))
+
+  (unless (stringp method)
+    (error "pastebin--url-retrieve-synchronously `method' need to be a string"))
+
+    (unless (stringp params)
+    (error "pastebin--url-retrieve-synchronously `params' need to be a string"))
+
+  (let* ((inhibit-read-only t)
+         (url-request-method method)
+         (url-request-extra-headers
+          '(("Content-Type" . "application/x-www-form-urlencoded")))
+         (url-request-data params)
+         (content-buf (url-retrieve-synchronously url)))
+    (unless (pastebin--http-200-p content-buf)
+      (when debug-on-error
+        (with-current-buffer (get-buffer-create "*pastebin-debug*")
+          (erase-buffer)
+          (goto-char (point-min))
+          (insert "Bad HTTP response below\n")
+          (insert-buffer content-buf))
+        (error (concat 
+                "pastebin--url-retrieve-synchronously HTTP Bad response (not 200) on header\n"
+                (if debug-on-error
+                    "See header at *pastebin-debug*"
+                  "")))))
+    (with-current-buffer content-buf
+      (pastebin--strip-http-header)
+      (pastebin--error-if-bad-response (current-buffer)) ;; two `with-current-buffer' on same buffer :-/ slow?
+    content-buf
+    )))
+
+(defun pastebin--error-if-bad-response (buf)
+  "Raises a error if is a bad response from pastebin"
+  (unless (or (bufferp buf)
+              (stringp buf))
+    (error "pastebin--bad-presponse-p `buf' need be a buffer or a string"))
+  
+  (with-current-buffer buf
+    (if (or 
+         (save-excursion
+           (re-search-forward "Bad API request," nil t))
+         (save-excursion
+           (re-search-forward "No pastes found." nil t))
+         (save-excursion
+           (re-search-forward "URL Post limit, maximum pastes per 24h reached" nil t)))
+        (error "Pastebin bad response: %s" (buffer-string))
+      nil)))
+
+
+(defun pastebin--http-200-p (header-buf)
+  "Search for HTTP 200 status on header-str - a buffer"
+  (unless (bufferp header-buf)
+    (error "pastebin--http-200-p: `header-buf' need be a buffer :/"))
+
+  (with-current-buffer header-buf
+    (save-excursion
+      (goto-char (point-min))
+      (re-search-forward "HTTP.*200 OK" nil t))))
+
+
+    
+
+
 ;; User interface 
 
 (defun pastebin-list-buffer-refresh ()
