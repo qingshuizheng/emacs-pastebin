@@ -609,12 +609,14 @@ See `fetch-list-xml' for more information"
     (make-directory pastebin-data-dir t)))
 
 (defun pastebin--ask-for-password (prompt)
+  "Ask user for a password and if want to store it"
   (lexical-let ((p (read-passwd prompt)))
     (when (yes-or-no-p "Store password on disk? ")
         (pastebin--store-password p))
     p))
 
 (defun* pastebin--url-retrieve-synchronously (&key url method params)
+  "Retrieve a buffer from pastebin, raising an error if an error ocurr"
   (unless (stringp url)
     (error "pastebin--url-retrieve-synchronously `url' need to be a string"))
 
@@ -636,12 +638,12 @@ See `fetch-list-xml' for more information"
           (erase-buffer)
           (goto-char (point-min))
           (insert "Bad HTTP response below\n")
-          (insert-buffer content-buf))
-        (error (concat 
-                "pastebin--url-retrieve-synchronously HTTP Bad response (not 200) on header\n"
-                (if debug-on-error
-                    "See header at *pastebin-debug*"
-                  "")))))
+          (insert-buffer content-buf)))
+      (error (concat 
+              "pastebin--url-retrieve-synchronously HTTP Bad response (not 200) on header\n"
+              (if debug-on-error
+                  "See header at *pastebin-debug*"
+                ""))))
     (with-current-buffer content-buf
       (pastebin--strip-http-header)
       (pastebin--error-if-bad-response (current-buffer)) ;; two `with-current-buffer' on same buffer :-/ slow?
