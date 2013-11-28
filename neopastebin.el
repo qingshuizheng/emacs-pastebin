@@ -430,7 +430,7 @@ Some keybinds are setted"
     (with-current-buffer (pastebin--url-retrieve-synchronously :url pastebin-post-request-paste-url
                                                                :method "POST"
                                                                :params params)
-      (buffer-string))))
+      (current-buffer))))
 
 
 
@@ -669,9 +669,17 @@ See `fetch-list-xml' for more information"
       (goto-char (point-min))
       (re-search-forward "HTTP.*200 OK" nil t))))
 
+(defun pastebin--get-pst-url (buf)
+  "Return url string from buf"
+  (unless (and (or (bufferp buf)
+                   (stringp buf))
+                (get-buffer buf))
+     (error (concat "pastebin--get-pst-url `buf' need\n"
+                    "be a existing buffer or buffer name as string")))
 
-    
-
+  (with-current-buffer buf
+    (save-excursion
+      (buffer-substring-no-properties (point-min) (point-max)))))
 
 ;; User interface 
 
@@ -732,9 +740,15 @@ Operates on current buffer"
   (interactive "P")
   (unless (is-logged pastebin--default-user)
     (login pastebin--default-user))
-  (message "URL %s" (paste-new pastebin--default-user (and p "1"))))
-
-
+  (save-excursion
+    (lexical-let* ((pbuf (paste-new pastebin--default-user (and p "1")))
+                   (url (pastebin--get-pst-url pbuf))
+                   (link-point (re-search-forward "http://[A-Za-z0-9_-]+\.[A-Za-z0-9]+" nil t)))
+      (message "URL: %s%s" url
+               (if link-point
+                   (concat (format "\nYour buffer contains an link at line %d\n" (line-number-at-pos link-point))
+                           (format "please visit http://pastebin.com and fill the captcha"))
+                 "")))))
 
 (defun* pastebin-create-login (&key username dev-key password)
   "Interface layer, do the login and set `pastebin--default-user'"
@@ -745,7 +759,7 @@ Operates on current buffer"
                      (pastebin--ask-for-password "Pastebin password: "))))
     (setq pastebin--default-user (pastebin--paste-user username
                                                      :username username
-                                                     :dev-key  dev-key
+                                                     :dev-key dev-key
                                                      :password p)))
   (message "User %s created, login is on demand. Have a nice day!" username))
 
