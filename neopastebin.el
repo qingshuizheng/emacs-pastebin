@@ -89,12 +89,6 @@
 ;;;
 ;;;
 ;;; @TODO list:
-;;;
-;;; - On pasting a new paste:
-;;;   - Setting pastebin minor mode on the buffer pasted
-;;;
-;;; - On fetching the paste
-;;;   - Set pastebin-minor-mode on it
 ;;;  
 ;;; - pastebin minor mode
 ;;;   - Must save files on pastebin with keybinds. I'm
@@ -102,6 +96,7 @@
 ;;;     is a good idea. If so, C-x C-s should save pastebin buffers
 ;;;     to pastebin.com without question. Elisp files manual chapter would help-me
 ;;;     to do that http://www.gnu.org/software/emacs/manual/html_node/elisp/Files.html#Files
+;;;   - Keybind for printing url on mini buffer
 ;;;
 ;;; DEPENDENCIES:
 ;;;
@@ -139,6 +134,14 @@
   :group 'pastebin)
 
 ;; Global variables
+
+(define-minor-mode pastebin-mode
+  "Pastebin buffer mode, used to upload pastes automatically with S-C-x C-s"
+  :lighter " pastebin"
+  :group 'pastebin
+  :keymap (let ((map (make-sparse-keymap)))
+            ;; defines goes here
+            map))
 
 (defvar pastebin--type-assoc
   '((actionscript-mode . " actionscript")
@@ -233,8 +236,8 @@
 
 (defvar pastebin--list-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "d") 'pastebin-delete-paste-at-point) ;; TODO 
-    (define-key map (kbd "r") 'pastebin-list-buffer-refresh) ;; TODO refresh pastebin list buffer
+    (define-key map (kbd "d") 'pastebin-delete-paste-at-point) 
+    (define-key map (kbd "r") 'pastebin-list-buffer-refresh) 
     (define-key map (kbd "f") 'pastebin-list-buffer-refresh-sort-by-format)
     (define-key map (kbd "t") 'pastebin-list-buffer-refresh-sort-by-title)
     (define-key map (kbd "k") 'pastebin-list-buffer-refresh-sort-by-key)
@@ -396,16 +399,10 @@ Some keybinds are setted"
                                                                  :params params)
         (oset user :usr-key (buffer-substring-no-properties (point-min) (point-max)))))))
 
-;; @TODO: I cant have keyword arguments here!?
-;; currently (1ea7df3) title syntax and buffer
-;; are not rightly handled
-;; How can I let user pass title syntax or buffer?
-;; Are all that arguments needed?
-(defmethod paste-new ((user pastebin--paste-user) &optional private title syntax buffer)
+(defmethod paste-new ((user pastebin--paste-user) &optional private)
   "Upload a new paste to pastebin.com"
-  (let* ((ptitle (or title (buffer-name)))
-         (pbuffer (or buffer (current-buffer)))
-         (psyntax (or syntax "text"))
+  (let* ((ptitle (buffer-name))
+         (pbuffer (current-buffer))
          (pprivate (or private "0"))
          (params (concat "api_dev_key=" (oref user :dev-key)
                          "&api_user_key=" (oref user :usr-key)
@@ -467,6 +464,7 @@ The contents of paste are not stored. Instead the method
       (insert-buffer content-buf)
       (funcall (get-mode p))
       (setq pastebin--local-buffer-paste p) ;; buffer local
+      (pastebin-mode 1)
       (current-buffer))))
 
 (defmethod paste-delete ((p pastebin--paste))
@@ -730,6 +728,7 @@ Operates on current buffer"
     (login pastebin--default-user))
   (save-excursion
     (goto-char (point-min))
+    (pastebin-mode 1)
     (lexical-let* ((pbuf (paste-new pastebin--default-user (and p "1")))
                    (url (pastebin--get-pst-url pbuf))
                    (link-point (re-search-forward "http://[A-Za-z0-9_-]+\.[A-Za-z0-9]+" nil t)))
