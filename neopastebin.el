@@ -164,7 +164,7 @@
     (csharp-mode . "csharp")
     (css-mode . "css")
     (delphi-mode . "delphi")
-    (diff-mode . "dff")
+    (diff-mode . "diff")
     (ebuild-mode . "bash")
     (eiffel-mode . "eiffel")
     (emacs-lisp-mode . "lisp")
