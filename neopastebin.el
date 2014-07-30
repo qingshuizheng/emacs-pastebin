@@ -495,17 +495,24 @@ Error if major-mode is nil"
   (or (cdr (assoc major-mode pastebin--type-assoc))
       "text"))
 
-(defun pastebin--sexp-get-attr-h (paste-sexp attr)
+(defun pastebin--sexp-get-attr-h (paste-sexp attr &optional onerror)
   "Return the attribute `attr' from `paste-sexp'
+If onerror is given (should be a string) is used when no such attribute
+is found.
 Attributes are described here: http://pastebin.com/api#9
 `attr' must be a symbol
 Ex: (pastebin-paste-get-attr some-paste-sexp 'paste_tittle)"
   (unless (symbolp attr)
     (error "attr should be a symbol"))
-  (let ((a (car (last (assoc attr (nthcdr 2 (car paste-sexp)))))))
+  (when (and onerror
+             (not (stringp onerror)))
+    (error "onerror should be a string"))
+  (let ((a (or (car (last (assoc attr (nthcdr 2 (car paste-sexp)))))
+               onerror)))
     (unless a
-      (error "No attribute %s on this paste-sexp" attr))
+      (error "No attribute %s on paste sexp '%s'" attr paste-sexp))
     (format "%s" a)))
+
 
 (defun pastebin--strip-CRs (&optional buffer)
   "Get rid of CRLF
@@ -549,7 +556,7 @@ See `fetch-list-xml' for more information"
       (pastebin--paste (concat "paste@" (pastebin--sexp-get-attr-h paste-sexp 'paste_key))
              :key (pastebin--sexp-get-attr-h paste-sexp 'paste_key)
              :date (pastebin--sexp-get-attr-h paste-sexp 'paste_date)
-             :title (pastebin--sexp-get-attr-h paste-sexp 'paste_title)
+             :title (pastebin--sexp-get-attr-h paste-sexp 'paste_title "UNTITLED")
              :size (pastebin--sexp-get-attr-h paste-sexp 'paste_size)
              :expire_date (pastebin--sexp-get-attr-h paste-sexp 'paste_expire_date)
              :private (pastebin--sexp-get-attr-h paste-sexp 'paste_private)
