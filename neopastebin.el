@@ -274,7 +274,7 @@
   "Fetch the list of pastes as xml, and return that buffer"
   (let* ((params (concat "api_dev_key=" (oref user dev-key)
                          "&api_user_key=" (oref user usr-key)
-                         "&api_results_limits=" (format "%d" pastebin-default-paste-list-limit)
+                         "&api_results_limit=" (format "%d" pastebin-default-paste-list-limit)
                          "&api_option=list")))
     (with-current-buffer (pastebin--url-retrieve-synchronously :url pastebin-post-request-paste-url
                                                                :method "POST"
