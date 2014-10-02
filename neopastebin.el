@@ -739,7 +739,9 @@ Operates on current buffer"
     (pastebin-mode 1)
     (lexical-let* ((pbuf (paste-new pastebin--default-user (and p "1")))
                    (url (pastebin--get-pst-url pbuf))
+                   (x-select-enable-clipboard t)
                    (link-point (re-search-forward "http://[A-Za-z0-9_-]+\.[A-Za-z0-9]+" nil t)))
+      (kill-new url)
       (message "URL: %s%s" url
                (if link-point
                    (concat (format "\nYour buffer contains an link at line %d\n" (line-number-at-pos link-point))
