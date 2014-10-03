@@ -458,7 +458,7 @@ The contents of paste are not stored. Instead the method
          (inhibit-read-only t)
          (pbuf (if (slot-boundp p :buffer)
                    (oref p :buffer)
-                 (oset p :buffer (get-buffer-create (concat "*paste " (oref p :title ) "*"))))))
+                 (oset p :buffer (get-buffer-create (oref p :title))))))
     (with-current-buffer pbuf
       (erase-buffer)
       (insert-buffer content-buf)
