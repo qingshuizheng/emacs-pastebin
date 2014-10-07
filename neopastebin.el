@@ -456,7 +456,8 @@ The contents of paste are not stored. Instead the method
                                                             :method "GET"
                                                             :params ""))
          (inhibit-read-only t)
-         (pbuf (if (slot-boundp p :buffer)
+         (pbuf (if (and (slot-boundp p :buffer)
+                        (buffer-live-p (oref p :buffer)))
                    (oref p :buffer)
                  (oset p :buffer (get-buffer-create (oref p :title))))))
     (with-current-buffer pbuf
