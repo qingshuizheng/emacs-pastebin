@@ -101,9 +101,11 @@
 ;;; DEPENDENCIES:
 ;;;
 ;;; eieio.el
+;;; wid-edit
 ;;;   
 
 (require 'eieio)
+(require 'wid-edit)
 
 (defgroup pastebin nil
   "Pastebin -- pastebin.com client"
@@ -461,7 +463,7 @@ The contents of paste are not stored. Instead the method
                  (oset p :buffer (get-buffer-create (oref p :title))))))
     (with-current-buffer pbuf
       (erase-buffer)
-      (insert-buffer content-buf)
+      (insert-buffer-substring content-buf)
       (funcall (get-mode p))
       (setq pastebin--local-buffer-paste p) ;; buffer local
       (pastebin-mode 1)
@@ -578,7 +580,7 @@ See `fetch-list-xml' for more information"
   "Read password from `pastebin-data-dir'/pass"
   (with-temp-buffer
     (goto-char (point-min))
-    (insert-file-literally (concat pastebin-data-dir "/pass"))
+    (insert-file-contents-literally (concat pastebin-data-dir "/pass"))
     (buffer-string)))
 
 (defun pastebin--password-file-exists-p ()
@@ -592,7 +594,8 @@ See `fetch-list-xml' for more information"
 
 (defun pastebin--ask-for-password (prompt)
   "Ask user for a password and if want to store it"
-  (lexical-let ((p (read-passwd prompt)))
+  (let* ((lexical-binding t)
+         (p (read-passwd prompt)))
     (when (yes-or-no-p "Store password on disk? ")
         (pastebin--store-password p))
     p))
@@ -620,7 +623,7 @@ See `fetch-list-xml' for more information"
           (erase-buffer)
           (goto-char (point-min))
           (insert "Bad HTTP response below\n")
-          (insert-buffer content-buf)))
+          (insert-buffer-substring content-buf)))
       (error (concat 
               "pastebin--url-retrieve-synchronously HTTP Bad response (not 200) on header\n"
               (if debug-on-error
@@ -722,7 +725,8 @@ Operates on current buffer"
 (defun pastebin-delete-paste-at-point ()
   "Delete the paste at point"
   (interactive)
-  (lexical-let ((p (pastebin--get-paste-at-point)))
+  (let* ((lexical-binding t)
+         (p (pastebin--get-paste-at-point)))
     (when (y-or-n-p (format "Do you really want to delete paste %s from %s\n" 
                             (oref p :title)
                             (format-time-string "%c" (seconds-to-time (string-to-number (oref p :date))))))
@@ -737,10 +741,11 @@ Operates on current buffer"
   (save-excursion
     (goto-char (point-min))
     (pastebin-mode 1)
-    (lexical-let* ((pbuf (paste-new pastebin--default-user (and p "1")))
-                   (url (pastebin--get-pst-url pbuf))
-                   (x-select-enable-clipboard t)
-                   (link-point (re-search-forward "http://[A-Za-z0-9_-]+\.[A-Za-z0-9]+" nil t)))
+    (let* ((lexical-binding t)
+           (pbuf (paste-new pastebin--default-user (and p "1")))
+           (url (pastebin--get-pst-url pbuf))
+           (x-select-enable-clipboard t)
+           (link-point (re-search-forward "http://[A-Za-z0-9_-]+\.[A-Za-z0-9]+" nil t)))
       (kill-new url)
       (message "URL: %s%s" url
                (if link-point
@@ -768,7 +773,8 @@ be strings"
     ;; Function body
     (unless (and username dev-key)
       (error "pastebin-login argument missing. (dev-key or username)"))
-    (lexical-let ((p (if (pastebin--password-file-exists-p)
+    (let ((lexical-binding t)
+          (p (if (pastebin--password-file-exists-p)
                          (pastebin--read-password-from-file)
                        (pastebin--ask-for-password "Pastebin password: "))))
       (setq pastebin--default-user (pastebin--paste-user username
