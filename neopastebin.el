@@ -464,6 +464,7 @@ The contents of paste are not stored. Instead the method
     (with-current-buffer pbuf
       (erase-buffer)
       (insert-buffer-substring content-buf)
+      (pastebin--strip-paste-CRs)
       (funcall (get-mode p))
       (setq pastebin--local-buffer-paste p) ;; buffer local
       (pastebin-mode 1)
@@ -515,6 +516,15 @@ Ex: (pastebin-paste-get-attr some-paste-sexp 'paste_tittle)"
       (error "No attribute %s on paste sexp '%s'" attr paste-sexp))
     (format "%s" a)))
 
+(defun pastebin--strip-paste-CRs (&optional buffer)
+  "Get rid of CR
+I use this after fetching a baste to get rid of annoying ^M"
+  (let ((buffer (or buffer (current-buffer))))
+    (with-current-buffer buffer
+      (goto-char (point-min))
+      (while (re-search-forward "\r" nil t)
+        (replace-match ""))
+      buffer)))
 
 (defun pastebin--strip-CRs (&optional buffer)
   "Get rid of CRLF
