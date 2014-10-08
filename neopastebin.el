@@ -104,7 +104,6 @@
 ;;;   
 
 (require 'eieio)
-(require 'cl)
 
 (defgroup pastebin nil
   "Pastebin -- pastebin.com client"
@@ -276,9 +275,9 @@
                          "&api_user_key=" (oref user usr-key)
                          "&api_results_limit=" (format "%d" pastebin-default-paste-list-limit)
                          "&api_option=list")))
-    (with-current-buffer (pastebin--url-retrieve-synchronously :url pastebin-post-request-paste-url
-                                                               :method "POST"
-                                                               :params params)
+    (with-current-buffer (pastebin--url-retrieve-synchronously pastebin-post-request-paste-url
+                                                               "POST"
+                                                               params)
       (pastebin--strip-CRs)
       (goto-char (point-min))
       (current-buffer)
@@ -394,9 +393,9 @@ Some keybinds are setted"
                            "&api_user_name=" (url-hexify-string (oref user :username))
                            "&api_user_password=" (url-hexify-string (oref user :password)))))
 
-      (with-current-buffer (pastebin--url-retrieve-synchronously :url pastebin-post-request-login-url
-                                                                 :method "POST"
-                                                                 :params params)
+      (with-current-buffer (pastebin--url-retrieve-synchronously pastebin-post-request-login-url
+                                                                 "POST"
+                                                                 params)
         (oset user :usr-key (buffer-substring-no-properties (point-min) (point-max)))))))
 
 (defmethod paste-new ((user pastebin--paste-user) &optional private)
@@ -412,9 +411,9 @@ Some keybinds are setted"
                                                                  (buffer-string)))
                          "&api_option=paste"
                          "&api_paste_private=" pprivate)))
-    (with-current-buffer (pastebin--url-retrieve-synchronously :url pastebin-post-request-paste-url
-                                                               :method "POST"
-                                                               :params params)
+    (with-current-buffer (pastebin--url-retrieve-synchronously pastebin-post-request-paste-url
+                                                               "POST"
+                                                               params)
       (current-buffer))))
 
 
@@ -452,9 +451,9 @@ The contents of paste are not stored. Instead the method
 
 (defmethod paste-fetch ((p pastebin--paste))
   "Fetch the raw content from paste and return buffer containing"
-  (let* ((content-buf (pastebin--url-retrieve-synchronously :url (concat pastebin--raw-paste-url (oref p key))
-                                                            :method "GET"
-                                                            :params ""))
+  (let* ((content-buf (pastebin--url-retrieve-synchronously (concat pastebin--raw-paste-url (oref p key))
+                                                            "GET"
+                                                            ""))
          (inhibit-read-only t)
          (pbuf (if (and (slot-boundp p :buffer)
                         (buffer-live-p (oref p :buffer)))
@@ -480,9 +479,9 @@ The contents of paste are not stored. Instead the method
                          "&api_user_key=" (oref (oref p :user) :usr-key)
                          "&api_paste_key=" (oref p :key)
                          "&api_option=delete")))
-    (with-current-buffer (pastebin--url-retrieve-synchronously :url pastebin-post-request-paste-url
-                                                               :method "POST"
-                                                               :params params)
+    (with-current-buffer (pastebin--url-retrieve-synchronously pastebin-post-request-paste-url
+                                                               "POST"
+                                                               params)
       (buffer-string)) ;; Pastebin send somthing like paste xxx deleted
     ))
 
@@ -598,7 +597,7 @@ See `fetch-list-xml' for more information"
         (pastebin--store-password p))
     p))
 
-(defun* pastebin--url-retrieve-synchronously (&key url method params)
+(defun pastebin--url-retrieve-synchronously (url method params)
   "Retrieve a buffer from pastebin, raising an error if an error ocurr"
   (unless (stringp url)
     (error "pastebin--url-retrieve-synchronously `url' need to be a string"))
@@ -749,18 +748,36 @@ Operates on current buffer"
                            (format "please visit link above and fill the captcha"))
                  "")))))
 
-(defun* pastebin-create-login (&key username dev-key password)
-  "Interface layer, do the login and set `pastebin--default-user'"
-  (unless (and username dev-key)
-    (error "pastebin-login argument missing. (dev-key or username)"))
-  (lexical-let ((p (if (pastebin--password-file-exists-p)
-                       (pastebin--read-password-from-file)
-                     (pastebin--ask-for-password "Pastebin password: "))))
-    (setq pastebin--default-user (pastebin--paste-user username
-                                                     :username username
-                                                     :dev-key dev-key
-                                                     :password p)))
-  (message "User %s created, login is on demand. Have a nice day!" username))
+(defun pastebin-create-login (&rest args)
+  "Create a login data. The effective login will be done when needed
+NOTE: `args' is a keryword list using :username and :dev-key that should
+be strings"
+  ;; Keyword arguments work arround
+  ;; I want to get rid of cl dependence here
+  (let* ((lexical-bind t)
+         username
+         dev-key
+         password)
+    (while args
+      (cond ((eq (car-safe args) :username)
+             (setq username (car-safe (cdr-safe args))))
+            ((eq (car-safe args) :dev-key)
+             (setq dev-key (car-safe (cdr-safe args))))
+            ) ;; (cond .. 
+      (setq args (cdr-safe args)))
+    ;; Function body
+    (unless (and username dev-key)
+      (error "pastebin-login argument missing. (dev-key or username)"))
+    (lexical-let ((p (if (pastebin--password-file-exists-p)
+                         (pastebin--read-password-from-file)
+                       (pastebin--ask-for-password "Pastebin password: "))))
+      (setq pastebin--default-user (pastebin--paste-user username
+                                                         :username username
+                                                         :dev-key dev-key
+                                                         :password p)))
+    (message "User %s created, login is on demand. Have a nice day!" username)
+    ) ;; (let* ((lexical-bind t)
+  ) ;; (defun pastebin-create-login &rest args)
 
 (provide 'neopastebin)
 
