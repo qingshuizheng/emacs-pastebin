@@ -684,7 +684,7 @@ Operates on current buffer"
     (login pastebin--default-user))
   (refresh-paste-list pastebin--default-user)
   (switch-to-buffer (do-list-buffer pastebin--default-user))
-  (message "%d pastes fetched!" (list-length (oref pastebin--default-user :paste-list)))
+  (message "%d pastes fetched!" (length (oref pastebin--default-user :paste-list)))
   )
 
 
