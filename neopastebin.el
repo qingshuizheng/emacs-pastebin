@@ -518,7 +518,7 @@ Ex: (pastebin-paste-get-attr some-paste-sexp 'paste_tittle)"
 
 (defun pastebin--strip-paste-CRs (&optional buffer)
   "Get rid of CR
-I use this after fetching a baste to get rid of annoying ^M"
+I use this after fetching a paste to get rid of annoying ^M"
   (let ((buffer (or buffer (current-buffer))))
     (with-current-buffer buffer
       (goto-char (point-min))
