@@ -1,26 +1,59 @@
-# From forked 
-> This is a fork of the emacs pastebin.com plugin avaialble via elpa.
+# Emacs Pastebin Interface
 
-> pastebin.com appear to have changed their API, so I have pathced the > pastebin.com file to reflect the new API.
-> 
-> Also new, you'll need your own API key. Create an account on 
-> pastebin.com then go to http://www.pastebin.com/api to see what your > key is. It needs to replace the string GET_YOUR_OWN_API_KEY in 
-> pastebin.el. I know that is ugly but it scratches my need. Feel free > to fork and fix that. :)
+This is a huge inteface to pastebin.com. With it you can
+* Paste buffers 
+* Fetch pastes
+* Delete pastes
+* Get a nice list of pastes
+* Sort the pastes list by data, title, private, format, key
 
-# Features 
+## Install
+``` bash
+cd ~/.emacs.d/
+wget https://github.com/gkos/emacs-pastebin/archive/master.zip
+unzip master.zip 
+emacs-pastebin-master/
+make
+```
 
-- The name of the current buffer is used as title to pastes
-- Get a list of your pastes in a interactive buffer using pastebin-list-buffer command
-- Open a paste by pressing RET on it at this buffer
-- Delete a paste by moving point to it and pressing 'd'
-- Replace a paste using the command pastebin-replace. If there is no paste with the name of the current buffer a new one is create. Note that the URL of the paste will change, just the name is keeped
-- Refresh the list by pressing 'r'
-- The login will go on only when you call an interactive function, avoiding anoying long emacs load time
-- Autoload major modes based on paste_format attribute while fetching a paste.
+Then put this on your `.emacs` file:
+```elisp
+(add-to-list 'load-path "~/.emacs.d/emacs-pastebin/")
+(require 'neopastebin)
+(pastebin-create-login :dev-key "YOURDEVKEY
+                       :username YOURUSER")
+```
 
-# Wishlist 
+Restart emacs or eval .emacs again.
+On emacs `M-x pastebin-l<TAB> <RET>`
+Type password
+Save password in disk, it will be saved in clear text at `~/.emacs.d/pastebin-data/pass` or whatever you set to `pastebin-data-dir`. If you really care, you can setup this variable to an encrypted partition. :P
 
-# TODO
+You should see a list of pastes on your screen.
 
-- Remove useless code (Review)
-- Fix elpa stuff
+## Usage
+
+### Listing 
+M-x pastebin-list-buffer-refresh -> Fetch and list pastes on "list buffer"
+After logged you can list your pastes with command `pastebin-list-buffer-refresh', just
+type pastebin-l and press TAB.
+
+Here is a list of keybinds from list buffer
+
+RET -> fetch paste and switch to it
+r ->   refresh list and list buffer
+d ->   delete paste, you'll be asked for confirmation
+t ->   order by title
+D ->   order by date
+f ->   order by format
+k ->   order by key
+p ->   order by private
+
+### Creating a new paste
+
+M-x pastebin-new -> will create a new paste from current buffer
+
+The name of the paste is given from current buffer name
+The format from buffers major mode
+Prefix argument makes private 
+
