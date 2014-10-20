@@ -136,13 +136,17 @@
 
 ;; Global variables
 
+(defvar pastebin--mode-map nil
+  "The pastebin keymap.")
+(unless pastebin--mode-map
+  (setq pastebin--mode-map (make-sparse-keymap))
+  (define-key pastebin--mode-map (kbd "C-x p u") 'pastebin-show-url))
+
 (define-minor-mode pastebin-mode
   "Pastebin buffer mode, used to upload pastes automatically with S-C-x C-s"
   :lighter " pastebin"
   :group 'pastebin
-  :keymap (let ((map (make-sparse-keymap)))
-            ;; defines goes here
-            map))
+  :keymap pastebin--mode-map)
 
 (defvar pastebin--type-assoc
   '((actionscript-mode . " actionscript")
@@ -689,6 +693,13 @@ See `fetch-list-xml' for more information"
 
 ;; User interface 
 
+(defun pastebin-show-url ()
+  "On a buffer from a fetched paste, show the url o echo area"
+  (interactive)
+  (if pastebin--local-buffer-paste
+      (message (format "Paste URL: %s" (oref pastebin--local-buffer-paste :url)))
+    (message (format "Current buffer is not a paste buffer"))))
+
 (defun pastebin-list-buffer-refresh ()
   "Refresh the list buffer screen
 Operates on current buffer"
@@ -794,6 +805,11 @@ be strings"
     (message "User %s created, login is on demand. Have a nice day!" username)
     ) ;; (let* ((lexical-bind t)
   ) ;; (defun pastebin-create-login &rest args)
+
+;; Setup minor mode keymap
+(or (assq 'pastebin-mode minor-mode-map-alist)
+    (setq minor-mode-map-alist (cons (cons 'pastebin-mode pastebin--mode-map)
+                                     minor-mode-map-alist)))
 
 (provide 'neopastebin)
 
