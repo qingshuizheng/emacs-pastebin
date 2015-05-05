@@ -408,7 +408,7 @@ Some keybinds are setted"
   "Upload a new paste to pastebin.com"
   (let* ((ptitle (buffer-name))
          (pbuffer (current-buffer))
-         (pprivate (or private "0"))
+         (pprivate (or private "1"))
          (params (concat "api_dev_key=" (oref user :dev-key)
                          "&api_user_key=" (oref user :usr-key)
                          "&api_paste_name=" (url-hexify-string ptitle)
