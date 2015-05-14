@@ -9,7 +9,7 @@ This is a huge inteface to pastebin.com. With it you can
 
 ## Install
 * Unpack the repo on ~/.emacs.d/lisp, create it if needed
-* Run make to compile it (optiional)
+* Run make to compile it (optional)
 * Put it on path on your .emacs file
 * Restart emacs
 ``` bash
