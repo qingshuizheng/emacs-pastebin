@@ -8,8 +8,13 @@ This is a huge inteface to pastebin.com. With it you can
 * Sort the pastes list by data, title, private, format, key
 
 ## Install
+* Unpack the repo on ~/.emacs.d/lisp, create it if needed
+* Run make to compile it (optiional)
+* Put it on path on your .emacs file
+* Restart emacs
 ``` bash
-cd ~/.emacs.d/
+mkdir ~/.emacs.d/lisp/
+cd ~/.emacs.d/lisp/
 wget https://github.com/gkos/emacs-pastebin/archive/master.zip
 unzip master.zip 
 rm master.zip
@@ -19,7 +24,7 @@ make
 
 Then put this on your `.emacs` file:
 ```elisp
-(add-to-list 'load-path "~/.emacs.d/emacs-pastebin/")
+(add-to-list 'load-path "~/.emacs.d/lisp/emacs-pastebin-master/")
 (require 'neopastebin)
 (pastebin-create-login :dev-key "YOURDEVKEY"
                        :username "YOURUSER")
