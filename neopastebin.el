@@ -404,11 +404,11 @@ Some keybinds are setted"
                                                                  params)
         (oset user :usr-key (buffer-substring-no-properties (point-min) (point-max)))))))
 
-(defmethod paste-new ((user pastebin--paste-user) &optional private)
+(defmethod paste-new ((user pastebin--paste-user) &optional unlisted)
   "Upload a new paste to pastebin.com"
   (let* ((ptitle (buffer-name))
          (pbuffer (current-buffer))
-         (pprivate (or private "1"))
+         (pprivate (if unlisted "0" "1"))
          (params (concat "api_dev_key=" (oref user :dev-key)
                          "&api_user_key=" (oref user :usr-key)
                          "&api_paste_name=" (url-hexify-string ptitle)
@@ -763,7 +763,7 @@ Operates on current buffer"
     (goto-char (point-min))
     (pastebin-mode 1)
     (let* ((lexical-binding t)
-           (pbuf (paste-new pastebin--default-user (and p "1")))
+           (pbuf (paste-new pastebin--default-user p))
            (url (pastebin--get-pst-url pbuf))
            (x-select-enable-clipboard t)
            (link-point (re-search-forward "http://[A-Za-z0-9_-]+\.[A-Za-z0-9]+" nil t)))
