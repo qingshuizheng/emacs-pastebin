@@ -18,7 +18,7 @@
 ;;; Boston, MA  02110-1301  USA
 
 ;;; Besides being a new interface, some parts were borrowed from old
-;;; interface so I think is fair put the names here. 
+;;; interface so I think is fair put the names here.
 ;;; Copyright (C) 2008 by Nic Ferrier <nic@ferrier.me.uk>
 ;;; Copyright (C) 2010 by Ivan Korotkov <twee@tweedle-dee.org>
 ;;; Copyright (C) 2012 by Filonenko Michael <filonenko.mikhail@gmail.com>
@@ -50,7 +50,7 @@
 ;;; on network, so you are not safe in any case, this is pastebin.com api and is insecure.
 ;;; Use at own risk!
 ;;;
-;;; 
+;;;
 ;;;     LISTING
 ;;;     ~~~~~~~
 ;;;
@@ -78,7 +78,7 @@
 ;;;
 ;;; The name of the paste is given from current buffer name
 ;;; The format from buffers major mode
-;;; Prefix argument makes private 
+;;; Prefix argument makes private
 ;;;
 
 ;;;
@@ -89,7 +89,7 @@
 ;;;
 ;;;
 ;;; @TODO list:
-;;;  
+;;;
 ;;; - pastebin minor mode
 ;;;   - Must save files on pastebin with keybinds. I'm
 ;;;     wondering if setting pastebin.com as an abstract storage
@@ -102,7 +102,7 @@
 ;;;
 ;;; eieio.el
 ;;; wid-edit
-;;;   
+;;;
 
 (require 'eieio)
 (require 'wid-edit)
@@ -112,7 +112,7 @@
   :tag "Pastebin"
   :group 'tools)
 
-;; Customs 
+;; Customs
 
 (defcustom pastebin-default-paste-list-limit 100
   "The number of pastes to retrieve by default"
@@ -241,8 +241,8 @@
 
 (defvar pastebin--list-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "d") 'pastebin-delete-paste-at-point) 
-    (define-key map (kbd "r") 'pastebin-list-buffer-refresh) 
+    (define-key map (kbd "d") 'pastebin-delete-paste-at-point)
+    (define-key map (kbd "r") 'pastebin-list-buffer-refresh)
     (define-key map (kbd "f") 'pastebin-list-buffer-refresh-sort-by-format)
     (define-key map (kbd "t") 'pastebin-list-buffer-refresh-sort-by-title)
     (define-key map (kbd "k") 'pastebin-list-buffer-refresh-sort-by-key)
@@ -354,19 +354,19 @@ Some keybinds are setted"
 
       (widget-minor-mode 1)
       (use-local-map pastebin--list-map)
-      
+
       (setq pastebin--list-buffer-user user)
 
       (widget-insert (format "%5.5s | %-8.8s | %-32.32s | %-7.7s | %-30.30s\n"
                              "VIEW" "ID" "TITLE" "FORMAT" "DATE"))
       (dolist (paste (oref user :paste-list))
-        (widget-create 'link 
+        (widget-create 'link
                        :notify (lambda (wid &rest ignore)
                                  (pastebin--fetch-paste-at-point))
                        :paste paste
                        :follow-link t
                        :value (format "%4.4s | %-8.8s | %-32.32s | %-7.7s | %-20.20s"
-                                      (cond 
+                                      (cond
                                        ((string= (oref paste :private) "0")
                                         "PUBL")
                                        ((string= (oref paste :private) "1")
@@ -440,7 +440,7 @@ Some keybinds are setted"
    (last-fetched :initarg :last-fetched)
    (user :initarg :user :type pastebin--paste-user)
    (hits :initarg :hits))
-  "Class representing a paste from pastebin.com 
+  "Class representing a paste from pastebin.com
 The contents of paste are not stored. Instead the method
 `paste-fetch' fetch and retrieve the buffer with paste contents")
 
@@ -478,7 +478,7 @@ The contents of paste are not stored. Instead the method
   "Detele paste from pastebin.com"
   (unless (and (slot-boundp p :user)
                (slot-boundp p :key)
-               (slot-boundp (oref p :user) :dev-key) 
+               (slot-boundp (oref p :user) :dev-key)
                (slot-boundp (oref p :user) :usr-key))
     (error "paste-delete called with ubound slot object"))
 
@@ -570,49 +570,18 @@ See `fetch-list-xml' for more information"
     (error "pastebin--sexp-to-paste called without cons type"))
   (condition-case err
       (pastebin--paste (concat "paste@" (pastebin--sexp-get-attr-h paste-sexp 'paste_key))
-             :key (pastebin--sexp-get-attr-h paste-sexp 'paste_key)
-             :date (pastebin--sexp-get-attr-h paste-sexp 'paste_date)
-             :title (pastebin--sexp-get-attr-h paste-sexp 'paste_title "UNTITLED")
-             :size (pastebin--sexp-get-attr-h paste-sexp 'paste_size)
-             :expire_date (pastebin--sexp-get-attr-h paste-sexp 'paste_expire_date)
-             :private (pastebin--sexp-get-attr-h paste-sexp 'paste_private)
-             :format_long (pastebin--sexp-get-attr-h paste-sexp 'paste_format_long)
-             :format_short (pastebin--sexp-get-attr-h paste-sexp 'paste_format_short)
-             :url (pastebin--sexp-get-attr-h paste-sexp 'paste_url)
-             )
+                       :key (pastebin--sexp-get-attr-h paste-sexp 'paste_key)
+                       :date (pastebin--sexp-get-attr-h paste-sexp 'paste_date)
+                       :title (pastebin--sexp-get-attr-h paste-sexp 'paste_title "UNTITLED")
+                       :size (pastebin--sexp-get-attr-h paste-sexp 'paste_size)
+                       :expire_date (pastebin--sexp-get-attr-h paste-sexp 'paste_expire_date)
+                       :private (pastebin--sexp-get-attr-h paste-sexp 'paste_private)
+                       :format_long (pastebin--sexp-get-attr-h paste-sexp 'paste_format_long)
+                       :format_short (pastebin--sexp-get-attr-h paste-sexp 'paste_format_short)
+                       :url (pastebin--sexp-get-attr-h paste-sexp 'paste_url)
+                       )
     ((debug error)
      (error "Cant construct paste from sexp %s\nError: %s" paste-sexp err))))
-
-(defun pastebin--store-password (passwd)
-  "Stores password on `pastebin-data-dir'/pass"
-  (pastebin--mkdatadir)
-  (with-temp-buffer
-    (insert passwd)
-    (write-file (concat pastebin-data-dir "/pass"))))
-
-(defun pastebin--read-password-from-file ()
-  "Read password from `pastebin-data-dir'/pass"
-  (with-temp-buffer
-    (goto-char (point-min))
-    (insert-file-contents-literally (concat pastebin-data-dir "/pass"))
-    (buffer-string)))
-
-(defun pastebin--password-file-exists-p ()
-  "return t if pastebin-data-dir exists"
-  (file-exists-p (concat pastebin-data-dir "/pass")))
-
-(defun pastebin--mkdatadir ()
-  "Create the `pastebin-data-dir'"
-  (ignore-errors
-    (make-directory pastebin-data-dir t)))
-
-(defun pastebin--ask-for-password (prompt)
-  "Ask user for a password and if want to store it"
-  (let* ((lexical-binding t)
-         (p (read-passwd prompt)))
-    (when (yes-or-no-p "Store password on disk? ")
-        (pastebin--store-password p))
-    p))
 
 (defun pastebin--url-retrieve-synchronously (url method params)
   "Retrieve a buffer from pastebin, raising an error if an error ocurr"
@@ -622,7 +591,7 @@ See `fetch-list-xml' for more information"
   (unless (stringp method)
     (error "pastebin--url-retrieve-synchronously `method' need to be a string"))
 
-    (unless (stringp params)
+  (unless (stringp params)
     (error "pastebin--url-retrieve-synchronously `params' need to be a string"))
 
   (let* ((inhibit-read-only t)
@@ -638,12 +607,12 @@ See `fetch-list-xml' for more information"
           (goto-char (point-min))
           (insert "Bad HTTP response below\n")
           (insert-buffer-substring content-buf)))
-      (error (concat 
+      (error (concat
               "pastebin--url-retrieve-synchronously HTTP Bad response (not 200) on header\n"
               (if debug-on-error
                   "See header at *pastebin-debug*"
                 "")))) ;; header is OK ...
-    (with-current-buffer content-buf   
+    (with-current-buffer content-buf
       (goto-char (point-min))
       (pastebin--strip-http-header)
       (pastebin--error-if-bad-response (current-buffer)) ;; two `with-current-buffer' on same buffer :-/ slow
@@ -656,9 +625,9 @@ See `fetch-list-xml' for more information"
   (unless (or (bufferp buf)
               (stringp buf))
     (error "pastebin--bad-presponse-p `buf' need be a buffer or a string"))
-  
+
   (with-current-buffer buf
-    (if (or 
+    (if (or
          (save-excursion
            (re-search-forward "Bad API request," nil t))
          (save-excursion
@@ -691,7 +660,7 @@ See `fetch-list-xml' for more information"
     (save-excursion
       (buffer-substring-no-properties (point-min) (point-max)))))
 
-;; User interface 
+;; User interface
 
 (defun pastebin-show-url ()
   "On a buffer from a fetched paste, show the url o echo area"
@@ -748,7 +717,7 @@ Operates on current buffer"
   (interactive)
   (let* ((lexical-binding t)
          (p (pastebin--get-paste-at-point)))
-    (when (y-or-n-p (format "Do you really want to delete paste %s from %s\n" 
+    (when (y-or-n-p (format "Do you really want to delete paste %s from %s\n"
                             (oref p :title)
                             (format-time-string "%c" (seconds-to-time (string-to-number (oref p :date))))))
       (message "%s" (paste-delete (pastebin--get-paste-at-point))))
@@ -789,19 +758,17 @@ be strings"
              (setq username (car-safe (cdr-safe args))))
             ((eq (car-safe args) :dev-key)
              (setq dev-key (car-safe (cdr-safe args))))
-            ) ;; (cond .. 
+            ((eq (car-safe args) :password)
+             (setq password (car-safe (cdr-safe args))))
+            ) ;; (cond ..
       (setq args (cdr-safe args)))
     ;; Function body
-    (unless (and username dev-key)
-      (error "pastebin-login argument missing. (dev-key or username)"))
-    (let ((lexical-binding t)
-          (p (if (pastebin--password-file-exists-p)
-                         (pastebin--read-password-from-file)
-                       (pastebin--ask-for-password "Pastebin password: "))))
-      (setq pastebin--default-user (pastebin--paste-user username
-                                                         :username username
-                                                         :dev-key dev-key
-                                                         :password p)))
+    (unless (and username dev-key password)
+      (error "pastebin-login argument missing. (dev-key or username or password)"))
+    (setq pastebin--default-user (pastebin--paste-user username
+                                                       :username username
+                                                       :dev-key dev-key
+                                                       :password password))
     (message "User %s created, login is on demand. Have a nice day!" username)
     ) ;; (let* ((lexical-bind t)
   ) ;; (defun pastebin-create-login &rest args)
