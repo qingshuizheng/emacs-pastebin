@@ -119,18 +119,13 @@
   :type 'number
   :group 'pastebin)
 
-(defcustom pastebin-post-request-login-url "http://pastebin.com/api/api_login.php"
+(defcustom pastebin-post-request-login-url "https://pastebin.com/api/api_login.php"
   "Login url"
   :type 'string
   :group 'pastebin)
 
-(defcustom pastebin-post-request-paste-url "http://pastebin.com/api/api_post.php"
+(defcustom pastebin-post-request-paste-url "https://pastebin.com/api/api_post.php"
   "Paste url"
-  :type 'string
-  :group 'pastebin)
-
-(defcustom pastebin-data-dir "~/.emacs.d/pastebin-data"
-  "Diretory to keep data"
   :type 'string
   :group 'pastebin)
 
