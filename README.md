@@ -35,8 +35,7 @@ Then put this on your `.emacs` file:
                        :password "YOURPASSWORD")
 ```
 
-Or, if you used `use-package` and `auth-source`, you can store dev-key and
-password in `~/.authinfo.gpg` file:
+Or, use `use-package` and `auth-source` like this:
 
 ```elisp
 (use-package neopastebin
@@ -50,6 +49,12 @@ password in `~/.authinfo.gpg` file:
     (pastebin-create-login :username "YOURUSER"
                            :dev-key (car credentials)
                            :password (cadr credentials))))
+```
+
+Before that, you should store `dev-key` and `password` in the `~/.authinfo.gpg` file:
+
+```text
+machine pastebin.com login YOURDEVKEY password YOURPASSWORD
 ```
 
 Restart emacs or eval `.emacs` again. On emacs `M-x pastebin-list-buffer-refresh <RET>`. You should see a nice list of pastes on your screen right now.
