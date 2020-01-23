@@ -30,12 +30,13 @@ Then put this on your `.emacs` file:
 ```elisp
 (add-to-list 'load-path "~/.emacs.d/lisp/emacs-pastebin-master/")
 (require 'neopastebin)
-(pastebin-create-login :dev-key "YOURDEVKEY"
-                       :username "YOURUSER"
-                       :password "YOURPASSWORD")
+(let ((credentials (auth-source-user-and-password "pastebin.com")))
+  (pastebin-create-login :username "YOURUSER"
+                         :dev-key (car credentials)
+                         :password (cadr credentials)))
 ```
 
-Or, use `use-package` and `auth-source` like this:
+Or, use `use-package` like this:
 
 ```elisp
 (use-package neopastebin

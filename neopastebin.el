@@ -24,6 +24,10 @@
 ;;; Copyright (C) 2012 by Filonenko Michael <filonenko.mikhail@gmail.com>
 
 ;;;
+;;; Commentary:
+;;;
+
+;;;
 ;;; USAGE:
 ;;;
 ;;;     LOGIN
@@ -31,24 +35,24 @@
 ;;;
 ;;; Puts this on your .emacs file
 ;;;
-;;; ((pastebin-create-login :dev-key "YOUR DEV KEY"
-;;;                     :username "YOUR USER NAME")
+;;;   (let ((credentials (auth-source-user-and-password "pastebin.com")))
+;;;     (pastebin-create-login :username "YOURUSER"
+;;;                            :dev-key (car credentials)
+;;;                            :password (cadr credentials)))
 ;;;
 ;;; Login will only ocurr when you try to paste something or
 ;;; list your pastes. So is save to put this on your .emacs file
 ;;; without need to wait emacs connect to pastebin on each startup.
 ;;;
 ;;;
-;;; -*- SECURITY DISCLAIMER -*-
+;;; -*- SECURITY REMINDER -*-
 ;;;
-;;; Password will be asked first time you login. It will also ask for store password
-;;; on disk. This will be saved on ~/.emacs.d/pastebin-data/pass by default.
+;;; It is NOT recommended to write "dev-key/password" to your .emacs file. You
+;;; should use `auth-source' or `auth-source-pass' package(s) to store and
+;;; read your "dev-key/password" securely.
 ;;;
-;;; !!! YOUR PASSWORD ITS SAVED ON PLAIN TEXT  !!!
-;;;
-;;; Since pastebin uses http instead of https, your password can be gathered from sniffers
-;;; on network, so you are not safe in any case, this is pastebin.com api and is insecure.
-;;; Use at own risk!
+;;; Since pastebin uses https instead http, your "dev-key/password" are secure
+;;; during transmission on network.
 ;;;
 ;;;
 ;;;     LISTING
@@ -56,8 +60,7 @@
 ;;;
 ;;; M-x pastebin-list-buffer-refresh -> Fetch and list pastes on "list buffer"
 ;;;
-;;; After logged you can list your pastes with command `pastebin-list-buffer-refresh', just
-;;; type pastebin-l and press TAB.
+;;; After logged you can list your pastes with command `pastebin-list-buffer-refresh'.
 ;;;
 ;;; Here is a list of keybinds from list buffer
 ;;;
@@ -88,22 +91,15 @@
 ;;; pastebin- prefix for user interface and customs
 ;;;
 ;;;
-;;; @TODO list:
-;;;
-;;; - pastebin minor mode
-;;;   - Must save files on pastebin with keybinds. I'm
-;;;     wondering if setting pastebin.com as an abstract storage
-;;;     is a good idea. If so, C-x C-s should save pastebin buffers
-;;;     to pastebin.com without question. Elisp files manual chapter would help-me
-;;;     to do that http://www.gnu.org/software/emacs/manual/html_node/elisp/Files.html#Files
-;;;   - Keybind for printing url on mini buffer
-;;;
 ;;; DEPENDENCIES:
 ;;;
 ;;; eieio.el
 ;;; wid-edit
 ;;;
 
+;;;
+;;; Codes:
+;;;
 (require 'eieio)
 (require 'wid-edit)
 
