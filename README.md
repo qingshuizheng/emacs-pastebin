@@ -82,7 +82,7 @@ p ->   order by private
 
 ### Creating a new paste
 
-M-x `pastebin-new` -> will create a new paste from current buffer
+M-x `pastebin-new` -> if there's active region, create a new paste from current selection, otherwise create from the whole buffer.
 
 The name of the paste is given from current buffer name
 The format from buffers major mode

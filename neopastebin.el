@@ -395,7 +395,26 @@ Some keybinds are setted"
                                                                  params)
         (oset user :usr-key (buffer-substring-no-properties (point-min) (point-max)))))))
 
-(defmethod paste-new ((user pastebin--paste-user) &optional unlisted)
+(defmethod paste-create (buffer-data &optional unlisted)
+  "Create new paste to pastebin.com helper"
+  (unless (is-logged pastebin--default-user)
+    (login pastebin--default-user))
+  (save-excursion
+    (goto-char (point-min))
+    (pastebin-mode 1)
+    (let* ((lexical-binding t)
+           (pbuf (paste-new pastebin--default-user buffer-data unlisted))
+           (url (pastebin--get-pst-url pbuf))
+           (x-select-enable-clipboard t)
+           (link-point (re-search-forward "http://[A-Za-z0-9_-]+\.[A-Za-z0-9]+" nil t)))
+      (kill-new url)
+      (message "URL: %s%s" url
+               (if link-point
+                   (concat (format "\nYour buffer contains an link at line %d\n" (line-number-at-pos link-point))
+		           (format "please visit link above and fill the captcha"))
+                 "")))))
+
+(defmethod paste-new ((user pastebin--paste-user) buffer-data &optional unlisted)
   "Upload a new paste to pastebin.com"
   (let* ((ptitle (buffer-name))
          (pbuffer (current-buffer))
@@ -405,7 +424,7 @@ Some keybinds are setted"
                          "&api_paste_name=" (url-hexify-string ptitle)
                          "&api_paste_format=" (url-hexify-string (pastebin--get-format-string-from-major-mode))
                          "&api_paste_code=" (url-hexify-string (with-current-buffer pbuffer
-                                                                 (buffer-string)))
+                                                                 buffer-data))
                          "&api_option=paste"
                          "&api_paste_private=" pprivate)))
     (with-current-buffer (pastebin--url-retrieve-synchronously pastebin-post-request-paste-url
@@ -653,6 +672,7 @@ See `fetch-list-xml' for more information"
 
 ;; User interface
 
+;;;###autoload
 (defun pastebin-show-url ()
   "On a buffer from a fetched paste, show the url o echo area"
   (interactive)
@@ -660,6 +680,7 @@ See `fetch-list-xml' for more information"
       (message (format "Paste URL: %s" (oref pastebin--local-buffer-paste :url)))
     (message (format "Current buffer is not a paste buffer"))))
 
+;;;###autoload
 (defun pastebin-list-buffer-refresh ()
   "Refresh the list buffer screen
 Operates on current buffer"
@@ -714,25 +735,16 @@ Operates on current buffer"
       (message "%s" (paste-delete (pastebin--get-paste-at-point))))
     (pastebin-list-buffer-refresh)))
 
+;;;###autoload
 (defun pastebin-new (p)
-  "Create a new paste from buffer"
+  "Create a new paste from current buffer or buffer region.
+If prefix with P, set it as private note."
   (interactive "P")
-  (unless (is-logged pastebin--default-user)
-    (login pastebin--default-user))
-  (save-excursion
-    (goto-char (point-min))
-    (pastebin-mode 1)
-    (let* ((lexical-binding t)
-           (pbuf (paste-new pastebin--default-user p))
-           (url (pastebin--get-pst-url pbuf))
-           (x-select-enable-clipboard t)
-           (link-point (re-search-forward "http://[A-Za-z0-9_-]+\.[A-Za-z0-9]+" nil t)))
-      (kill-new url)
-      (message "URL: %s%s" url
-               (if link-point
-                   (concat (format "\nYour buffer contains an link at line %d\n" (line-number-at-pos link-point))
-                           (format "please visit link above and fill the captcha"))
-                 "")))))
+  (if (use-region-p)
+      (paste-create (buffer-substring-no-properties
+                     (region-beginning)
+                     (region-end)) p)
+    (paste-create (buffer-string) p)))
 
 (defun pastebin-create-login (&rest args)
   "Create a login data. The effective login will be done when needed
