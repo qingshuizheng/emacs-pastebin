@@ -262,11 +262,11 @@
   )
   "Class representing a pastebin.com user")
 
-(defmethod is-logged ((user pastebin--paste-user))
+(cl-defmethod is-logged ((user pastebin--paste-user))
   "Return true if user is logged in"
   (slot-boundp user :usr-key))
 
-(defmethod fetch-list-xml ((user pastebin--paste-user))
+(cl-defmethod fetch-list-xml ((user pastebin--paste-user))
   "Fetch the list of pastes as xml, and return that buffer"
   (let* ((params (concat "api_dev_key=" (oref user dev-key)
                          "&api_user_key=" (oref user usr-key)
@@ -280,7 +280,7 @@
       (current-buffer)
       )))
 
-(defmethod refresh-paste-list ((user pastebin--paste-user))
+(cl-defmethod refresh-paste-list ((user pastebin--paste-user))
   "Set/Refresh paste-list attr to the list of paste objects retrieved from pastebin.com"
   (oset user :paste-list nil)
   (with-current-buffer (fetch-list-xml user)
@@ -322,7 +322,7 @@
      )
   )
 
-(defmethod do-list-buffer ((user pastebin--paste-user))
+(cl-defmethod do-list-buffer ((user pastebin--paste-user))
   "Create a buffer with a list of pastes and return it
 Some keybinds are setted"
   (unless (is-logged user)
@@ -382,7 +382,7 @@ Some keybinds are setted"
     ) ;; (let ((inhibit-read-only t)
   )
 
-(defmethod login ((user pastebin--paste-user))
+(cl-defmethod login ((user pastebin--paste-user))
   "Given user and password login and sets usr-key"
   (if (slot-boundp user :usr-key)
       (oref user :usr-key)
@@ -395,7 +395,7 @@ Some keybinds are setted"
                                                                  params)
         (oset user :usr-key (buffer-substring-no-properties (point-min) (point-max)))))))
 
-(defmethod paste-create (buffer-data &optional unlisted)
+(cl-defmethod paste-create (buffer-data &optional unlisted)
   "Create new paste to pastebin.com helper"
   (unless (is-logged pastebin--default-user)
     (login pastebin--default-user))
@@ -414,7 +414,7 @@ Some keybinds are setted"
 		           (format "please visit link above and fill the captcha"))
                  "")))))
 
-(defmethod paste-new ((user pastebin--paste-user) buffer-data &optional unlisted)
+(cl-defmethod paste-new ((user pastebin--paste-user) buffer-data &optional unlisted)
   "Upload a new paste to pastebin.com"
   (let* ((ptitle (buffer-name))
          (pbuffer (current-buffer))
@@ -454,18 +454,18 @@ Some keybinds are setted"
 The contents of paste are not stored. Instead the method
 `paste-fetch' fetch and retrieve the buffer with paste contents")
 
-(defmethod get-mode ((p pastebin--paste))
+(cl-defmethod get-mode ((p pastebin--paste))
   "return the mode from `pastebin--type-assoc'"
   (if (slot-boundp p :format_short)
       (car (rassoc (oref p :format_short) pastebin--type-assoc))
     (error "No format short for paste %s with key %s" (oref p :title) (oref p :key))))
 
-(defmethod fetch-and-process ((p pastebin--paste))
+(cl-defmethod fetch-and-process ((p pastebin--paste))
   "Fetch buffer a do needed processing before switching to it"
   (with-current-buffer (paste-fetch p)
     (switch-to-buffer (current-buffer))))
 
-(defmethod paste-fetch ((p pastebin--paste))
+(cl-defmethod paste-fetch ((p pastebin--paste))
   "Fetch the raw content from paste and return buffer containing"
   (let* ((content-buf (pastebin--url-retrieve-synchronously (concat pastebin--raw-paste-url (oref p key))
                                                             "GET"
@@ -484,7 +484,7 @@ The contents of paste are not stored. Instead the method
       (pastebin-mode 1)
       (current-buffer))))
 
-(defmethod paste-delete ((p pastebin--paste))
+(cl-defmethod paste-delete ((p pastebin--paste))
   "Detele paste from pastebin.com"
   (unless (and (slot-boundp p :user)
                (slot-boundp p :key)
